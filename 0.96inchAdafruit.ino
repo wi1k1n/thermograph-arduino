@@ -2,8 +2,9 @@
 #define TEMPSHOWINTERVAL 500
 #define TEMPSTOREINTERVAL 500
 #define TEMPAVERAGEN 20  // [0..255] - number of intermediate measurements
-
 #define MEASDATALENGTH 128
+
+#define DISPLAYDIMTIMEOUT 15000
 
 
 //#define EEPROMMEASBITS 5  // [1..8] - how many bits to use for each measurement when storing in EEPROM
@@ -44,6 +45,7 @@ GButton btnR(BTNRIGHT_PIN, LOW_PULL);
 GTimer timerGetTemp;
 GTimer timerShowTemp;
 GTimer timerStoreTemp;
+GTimer timerDisplayDim;
 
 // temperature variables
 float tempValPartAverage;  // partially averaged value of analogRead(thermistor)
@@ -65,10 +67,12 @@ byte measMinInd = 0;
 byte measMaxInd = 0;
 byte scale = 1;
 
+bool isDimmed = false;
+
 
 
 // Menu variables
-byte menuState = 1;  // 0 - live temp, 1 - graph, 2 - settings
+byte menuState = 0;  // 0 - live temp, 1 - graph, 2 - settings
 
 // EEPROM management variables
 // x - not used, b - bit value
@@ -92,6 +96,8 @@ void setup() {
   timerShowTemp.setInterval(TEMPSHOWINTERVAL);
   timerStoreTemp.setInterval(TEMPSTOREINTERVAL);
   timerGetTemp.setInterval((min(TEMPSHOWINTERVAL, TEMPSTOREINTERVAL) - 1) / TEMPAVERAGEN);
+  
+  timerDisplayDim.setTimeout(DISPLAYDIMTIMEOUT);
 }
 
 void loop() {
@@ -109,10 +115,21 @@ void loop() {
   }
 
   bool menuJustChanged = false;
-  if (btnL.isSingle()) {}
+  if (btnL.isSingle()) {
+    if (isDimmed) {
+      dim(false);
+    } else {
+      updateDimTimer();
+    }
+  }
   if (btnR.isSingle()) {
-    menuState = (menuState + 1) % 3;
-    menuJustChanged = true;
+    if (isDimmed) {
+      dim(false);
+    } else {
+      updateDimTimer();
+      menuState = (menuState + 1) % 3;
+      menuJustChanged = true;
+    }
   }
 
   if (menuState == 0) {
@@ -121,6 +138,10 @@ void loop() {
     displayGraph(menuJustChanged);
   } else {
     displaySettings();
+  }
+
+  if (timerDisplayDim.isReady()) {
+    dim(true);
   }
 }
 
@@ -140,18 +161,40 @@ void initDisplay() {
   display.clearDisplay();
 }
 
+// resets timeout 
+void updateDimTimer() {
+  timerDisplayDim.start();
+}
+// either turns dim on or off
+void dim(bool v) {
+  if (!v) {
+    updateDimTimer();
+    // clear display to not have any flashing screens
+    display.clearDisplay();
+    display.display();
+  }
+  display.dim(v);
+  isDimmed = v;
+}
 // show live temperature on display
 void displayLive(bool menuJustChanged) {
+  // do not waste cpu if display is isDimmed
+  if (isDimmed) return;
+
   // skip execution until show timer is ready
   if (!menuJustChanged && !timerShowTemp.isReady())
     return;
   
   // calc averaged value of temperature
     float t;
-    if (tempValN == 0)
+    if (tempValN == 0) {
+      Serial.println("live: measData");
       t = measData[(curs == 0 ? MEASDATALENGTH : curs) - 1];
-    else
+    }
+    else {
+      Serial.println("live: computeTemp");
       t = therm.computeTemp(tempValPartAverage);
+    }
     dtostrf(t, 6, 2, tempStrBuf);
   
 //  Serial.print("showTemp:  ");
@@ -173,6 +216,8 @@ void displayLive(bool menuJustChanged) {
 }
 
 void displayGraph(bool menuJustChanged) {
+  if (isDimmed) return;
+
   /* === draw caption === */
   if (timerShowTemp.isReady() || menuJustChanged) {
     display.fillRect(0, 0, SCREEN_WIDTH, DISPLAYPADDINGTOP, SSD1306_BLACK);
@@ -242,6 +287,8 @@ void displayGraph(bool menuJustChanged) {
   display.display();
 }
 void displaySettings() {
+  if (isDimmed) return;
+
   display.clearDisplay();
   
   display.setCursor(0, 16);
