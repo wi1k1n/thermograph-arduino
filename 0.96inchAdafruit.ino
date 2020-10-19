@@ -2,9 +2,9 @@
 #define TEMPSHOWINTERVAL 500
 #define TEMPSTOREINTERVAL 500
 #define TEMPAVERAGEN 20  // [0..255] - number of intermediate measurements
-#define MEASDATALENGTH 128
+#define MEASDATALENGTH 64
 
-#define DISPLAYDIMTIMEOUT 15000
+#define DISPLAYDIMTIMEOUT 0
 
 
 //#define EEPROMMEASBITS 5  // [1..8] - how many bits to use for each measurement when storing in EEPROM
@@ -24,7 +24,9 @@
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 #define DISPLAYPADDINGTOP 16
 #define DISPLAYDATAHEIGHT 64-16  // SCREEN_HEIGHT - DISPLAYPADDINGTOP
-#define GRAPHYOFFSET (64 - 16) / 2  // DISPLAYDATAHEIGHT / 2
+// #define GRAPHYOFFSET (64 - 16) / 2  // DISPLAYDATAHEIGHT / 2
+#define GRAPHPADDINGTOP 2
+#define GRAPHPADDINGBOT 2
 
 #include <SPI.h>
 #include <Wire.h>
@@ -47,13 +49,15 @@ GTimer timerShowTemp;
 GTimer timerStoreTemp;
 GTimer timerDisplayDim;
 
+char tempStrBuf[6];
+bool isDimmed = false;
+
 // temperature variables
 float tempValPartAverage;  // partially averaged value of analogRead(thermistor)
 byte tempValN = 0;  // number of currently got measurements
-// TODO: change this to int8 in a correct way
 float temp;  // degrees of Celsium
-char tempStrBuf[6];
 
+// measurements and display graph variables
 int8_t measData[MEASDATALENGTH];
 byte curs = 0;
 bool cycled = false;
@@ -65,14 +69,18 @@ float measMaxG = INT32_MIN;
 byte measMinB = INT8_MAX;
 byte measMinInd = 0;
 byte measMaxInd = 0;
-byte scale = 1;
-
-bool isDimmed = false;
-
-
+float scale = 2.f;
 
 // Menu variables
-byte menuState = 0;  // 0 - live temp, 1 - graph, 2 - settings
+byte menuScreen = 1;  // 0 - live temp, 1 - graph, 2 - settings
+byte settingSelected = 0;
+byte settingIsChanging = false;
+char* settingsOptsDimming[] = {"off", "5s", "10s", "15s"};
+#define SETTINGSOPTSDIMMINGSIZE 4
+byte settingsOptsDimmingCur = 0;
+char* settingsOptsGraph[] = {"0.5s", "1s", "5s", "15s", "30s", "1m", "2m", "5m"};
+#define SETTINGSOPTSGRAPHSIZE 8
+byte settingsOptsGraphCur = 0;
 
 // EEPROM management variables
 // x - not used, b - bit value
@@ -84,7 +92,7 @@ byte menuState = 0;  // 0 - live temp, 1 - graph, 2 - settings
 //unsigned int eepromCursor = 0;
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(57600);
 
   // Serial.print("DISPLAYDATAHEIGHT: ");
   // Serial.println(DISPLAYDATAHEIGHT);
@@ -97,7 +105,7 @@ void setup() {
   timerStoreTemp.setInterval(TEMPSTOREINTERVAL);
   timerGetTemp.setInterval((min(TEMPSHOWINTERVAL, TEMPSTOREINTERVAL) - 1) / TEMPAVERAGEN);
   
-  timerDisplayDim.setTimeout(DISPLAYDIMTIMEOUT);
+  if (DISPLAYDIMTIMEOUT > 0) timerDisplayDim.setTimeout(DISPLAYDIMTIMEOUT);
 }
 
 void loop() {
@@ -116,28 +124,52 @@ void loop() {
 
   bool menuJustChanged = false;
   if (btnL.isSingle()) {
-    if (isDimmed) {
-      dim(false);
-    } else {
-      updateDimTimer();
+    // if button has been pushed while active (not sleeping)
+    if (!dimActionPerformed()) {
+      // if settings screen
+      if (menuScreen == 2) {
+          // if in process of changing settings
+          if (settingIsChanging) {
+            settingIsChanging = false;
+          }
+          // if not changing settings atm
+          else {
+            settingSelected = (settingSelected + 1) % 2;
+          }
+          menuJustChanged = true;
+      }
+    }
+  }
+  if (btnL.isHolded()) {
+    // if settings screen
+    if (menuScreen == 2) {
+      // if not changing
+      if (!settingIsChanging) {
+        settingIsChanging = true;
+        menuJustChanged = true;
+      }
     }
   }
   if (btnR.isSingle()) {
-    if (isDimmed) {
-      dim(false);
-    } else {
-      updateDimTimer();
-      menuState = (menuState + 1) % 3;
+    if (!dimActionPerformed()) {
+      // if in process of changing settings
+      if (menuScreen == 2 && settingIsChanging) {
+        incrementSettingSelected();
+      }
+      // if not changing settings
+      else {
+        menuScreen = (menuScreen + 1) % 3;
+      }
       menuJustChanged = true;
     }
   }
 
-  if (menuState == 0) {
+  if (menuScreen == 0) {
     displayLive(menuJustChanged);
-  } else if (menuState == 1) {
+  } else if (menuScreen == 1) {
     displayGraph(menuJustChanged);
   } else {
-    displaySettings();
+    displaySettings(menuJustChanged);
   }
 
   if (timerDisplayDim.isReady()) {
@@ -161,12 +193,20 @@ void initDisplay() {
   display.clearDisplay();
 }
 
-// resets timeout 
-void updateDimTimer() {
-  timerDisplayDim.start();
+// either wakes arduino up and resets dimTimeout, or just resets timeout.
+// returns true, if woke up, false, if only timeout has been reset
+bool dimActionPerformed() {
+  if (isDimmed) {
+    dim(false);
+    return true;
+  } else {
+    updateDimTimer();
+    return false;
+  }
 }
 // either turns dim on or off
 void dim(bool v) {
+  if (DISPLAYDIMTIMEOUT == 0) return;
   if (!v) {
     updateDimTimer();
     // clear display to not have any flashing screens
@@ -176,6 +216,20 @@ void dim(bool v) {
   display.dim(v);
   isDimmed = v;
 }
+// resets timeout 
+void updateDimTimer() {
+  if (DISPLAYDIMTIMEOUT == 0) return;
+  timerDisplayDim.start();
+}
+
+void incrementSettingSelected() {
+  if (settingSelected == 0) {
+    settingsOptsDimmingCur = (settingsOptsDimmingCur + 1) % SETTINGSOPTSDIMMINGSIZE;
+  } else {
+    settingsOptsGraphCur = (settingsOptsGraphCur + 1) % SETTINGSOPTSGRAPHSIZE;
+  }
+}
+
 // show live temperature on display
 void displayLive(bool menuJustChanged) {
   // do not waste cpu if display is isDimmed
@@ -186,27 +240,16 @@ void displayLive(bool menuJustChanged) {
     return;
   
   // calc averaged value of temperature
-    float t;
-    if (tempValN == 0) {
-      Serial.println("live: measData");
-      t = measData[(curs == 0 ? MEASDATALENGTH : curs) - 1];
-    }
-    else {
-      Serial.println("live: computeTemp");
-      t = therm.computeTemp(tempValPartAverage);
-    }
-    dtostrf(t, 6, 2, tempStrBuf);
-  
-//  Serial.print("showTemp:  ");
-//  Serial.println(temp);
+  dtostrf(temp, 6, 2, tempStrBuf);
   
   display.clearDisplay();
   
   // char size at scale 1 is 5x8. 6 digits and font_scale=3
-  display.setCursor((SCREEN_WIDTH - 6*5*3) / 2, DISPLAYPADDINGTOP + 6);
+  // display.setCursor((SCREEN_WIDTH - 6*5*3) / 2, DISPLAYPADDINGTOP + 6);
+  display.setCursor(0, DISPLAYPADDINGTOP);
   display.setTextColor(SSD1306_WHITE);  // Draw white text
   display.setTextSize(3);
-  display.print(t);
+  display.print(tempStrBuf);
 
   display.setCursor(display.getCursorX(), display.getCursorY() - 4);
   display.setTextSize(2);
@@ -228,25 +271,22 @@ void displayGraph(bool menuJustChanged) {
 
     // do not show min/max until first storage iteration updates its default values
     if (cycled || curs > 0) {
-      float t;
-      if (tempValN == 0)
-        t = measData[(curs == 0 ? MEASDATALENGTH : curs) - 1];
-      else
-        t = therm.computeTemp(tempValPartAverage);
-
-      display.print(t);
+      display.print(temp);
       display.print(" ");
       byte curX = display.getCursorX();
       display.print("l:");
-      display.print(measMin);
+      dtostrf(measMin, 6, 2, tempStrBuf);
+      display.print(tempStrBuf);
       display.print(" ");
-      display.print(measMax);
-      // display.print(")");
+      dtostrf(measMax, 6, 2, tempStrBuf);
+      display.print(tempStrBuf);
       display.setCursor(curX, 8);
       display.print("g:");
-      display.print(measMinG);
+      dtostrf(measMinG, 6, 2, tempStrBuf);
+      display.print(tempStrBuf);
       display.print(" ");
-      display.print(measMaxG);
+      dtostrf(measMaxG, 6, 2, tempStrBuf);
+      display.print(tempStrBuf);
     }
   }
 
@@ -258,45 +298,52 @@ void displayGraph(bool menuJustChanged) {
 
     // i iterates from 0 to cursor (or from cursor+1 up to cursor, wrapping around the MEASDATALENGTH)
     byte i = cycled ? (curs + 1) : 0;
-    // Serial.print("curs: ");
-    // Serial.print(curs);
-    // Serial.print("; i: ");
-    // Serial.print(i);
-    // Serial.print("; measData[i]: ");
     byte prevX = 0;
     // constrain is needed to correctly fit into screen
-    byte prevY = (measData[(i < MEASDATALENGTH ? i : 0)] - measMinB) * scale + DISPLAYPADDINGTOP;
-    // byte prevY = (measData[(i < MEASDATALENGTH ? i : 0)] - measMinB) * scale + DISPLAYPADDINGTOP + GRAPHYOFFSET;  // use this for aligning graph vertically to the center
-    // Serial.println(measData[i]);
+    byte prevY = SCREEN_HEIGHT - GRAPHPADDINGBOT - (measData[(i < MEASDATALENGTH ? i : 0)] - measMinB) * scale;
     for (byte x = 1;; i++, x++) {
       if (i == MEASDATALENGTH) i = 0;  // wrap around i
       if (i == curs) break;  // stop condition
-      byte y = (measData[i] - measMinB) * scale + DISPLAYPADDINGTOP;
-      // byte y = (measData[i] - measMinB) * scale + DISPLAYPADDINGTOP + GRAPHYOFFSET;  // use this for aligning graph vertically to the center
-      // Serial.print(measData[i]);
-      // Serial.print(" -> ");
-      // Serial.println(y);
+      byte y = SCREEN_HEIGHT - GRAPHPADDINGBOT - (measData[i] - measMinB) * scale;
       display.drawLine(prevX, prevY, x, y, SSD1306_WHITE);
       prevX = x;
       prevY = y;
     }
-    // Serial.print(" -> ");
-    // Serial.println(i);
   }
 
   display.display();
 }
-void displaySettings() {
+void displaySettings(bool menuJustChanged) {
   if (isDimmed) return;
 
-  display.clearDisplay();
-  
-  display.setCursor(0, 16);
-  display.setTextColor(SSD1306_WHITE);  // Draw white text
-  display.setTextSize(2);
-  display.print("Settings!");
-  
-  display.display();
+  if (menuJustChanged) {
+    display.clearDisplay();
+    display.setTextSize(1);
+
+    // dimming timeout
+    display.setCursor(0, DISPLAYPADDINGTOP);
+    if (!settingIsChanging && settingSelected == 0) display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+    else display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    display.print("      Dimming:");
+    display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    display.print(" ");
+    if (settingIsChanging && settingSelected == 0) display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+    else display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    display.print(settingsOptsDimming[settingsOptsDimmingCur]);
+    
+    display.setCursor(0, DISPLAYPADDINGTOP + 10);
+    display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    if (!settingIsChanging && settingSelected == 1) display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+    else display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    display.print("Graph timeout:");
+    display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    display.print(" ");
+    if (settingIsChanging && settingSelected == 1) display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+    else display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    display.print(settingsOptsGraph[settingsOptsGraphCur]);
+    
+    display.display();
+  }
 }
 
 void measurePartial() {
@@ -312,6 +359,7 @@ void storeMeasurement() {
   tempValPartAverage = 0;
   tempValN = 0;
   
+  // check, if are going to overrid min or max value
   bool recalcMin = curs == measMinInd;
   bool recalcMax = curs == measMaxInd;
   bool recalcRange = false;
@@ -326,9 +374,7 @@ void storeMeasurement() {
     recalcMin = false;
     recalcRange = true;
     // Serial.print("measMin: ");
-    // Serial.print(measMin);
-    // Serial.print("; scale: ");
-    // Serial.println(scale);
+    // Serial.println(measMin);
   }
   if (temp > measMax) {
     measMax = temp;
@@ -336,9 +382,7 @@ void storeMeasurement() {
     recalcMax = false;
     recalcRange = true;
     // Serial.print("measMax: ");
-    // Serial.print(measMax);
-    // Serial.print("; scale: ");
-    // Serial.println(scale);
+    // Serial.println(measMax);
   }
   // update global min/max
   if (temp < measMinG) measMinG = temp;
@@ -348,7 +392,6 @@ void storeMeasurement() {
   measChanged = true;
   if (curs == MEASDATALENGTH - 1) {
     cycled = true;
-    Serial.println("cycled!");
     curs = 0;
   } else {
     curs++;
@@ -370,7 +413,7 @@ void storeMeasurement() {
   }
   if (recalcMax) {
     recalcRange = true;
-    measMax = INT32_MIN;
+    measMax = (float)INT32_MIN;
     byte i = cycled ? (curs + 1) : 0;
     for (;; i++) {
       if (i == MEASDATALENGTH) i = 0;
@@ -384,7 +427,10 @@ void storeMeasurement() {
   if (recalcMin || recalcMax || recalcRange) {
     measMinB = measMin;
     float range = measMax - measMin;
-    // if (range >= 1) scale = (GRAPHYOFFSET - 1) / range;  // use this for aligning graph vertically to the center
-    if (range >= 1) scale = (DISPLAYDATAHEIGHT - 1) / range;
+    if (range >= 0.5f) scale = (DISPLAYDATAHEIGHT - 1 - (GRAPHPADDINGTOP + GRAPHPADDINGBOT)) / range;  // use this for aligning graph vertically to the center
+    else scale = 2.f;
+    
+    // Serial.print("; scale: ");
+    // Serial.println(scale);
   }
 }
