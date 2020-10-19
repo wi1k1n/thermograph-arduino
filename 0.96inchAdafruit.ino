@@ -1,8 +1,8 @@
 // Settings constants
 #define TEMPSHOWINTERVAL 500
-#define TEMPSTOREINTERVAL 500
+#define TEMPSTOREINTERVALDEFAULT 1000
 #define TEMPAVERAGEN 20  // [0..255] - number of intermediate measurements
-#define MEASDATALENGTH 32
+#define MEASDATALENGTH 128
 
 #define DISPLAYDIMTIMEOUTDEFAULT 15000
 // #define DISPLAYDIMENABLED  // uncomment this to enable
@@ -71,7 +71,7 @@ float measMin = INT32_MAX;
 float measMax = INT32_MIN;
 float measMinG = INT32_MAX;
 float measMaxG = INT32_MIN;
-byte measMinB = INT8_MAX;
+int8_t measMin8 = INT8_MAX;
 byte measMinInd = 0;
 byte measMaxInd = 0;
 float scale = 2.f;
@@ -85,9 +85,9 @@ byte settingIsChanging = false;
 const char* const PROGMEM settingsOptsDimming[] = {"off ", " 5s ", "10s ", "15s ", "30s ", "60s "};
 #define SETTINGSOPTSDIMMINGSIZE 6
 byte settingsOptsDimmingCur = 0;
-const char* const PROGMEM settingsOptsGraph[] = {"0.5s", "1s ", "5s ", "15s ", "30s ", " 1m ", " 2m ", " 5m "};
-#define SETTINGSOPTSGRAPHSIZE 8
-byte settingsOptsGraphCur = 0;
+const char* const PROGMEM settingsOptsGraph[] = {".25s", ".5s ", "1s ", "5s ", "15s ", "30s ", " 1m ", " 2m ", " 5m "};
+#define SETTINGSOPTSGRAPHSIZE 9
+byte settingsOptsGraphCur = 1;
 
 // EEPROM management variables
 // x - not used, b - bit value
@@ -208,8 +208,8 @@ void initButtons() {
 }
 void initTimers() {
   timerShowTemp.setInterval(TEMPSHOWINTERVAL);
-  timerStoreTemp.setInterval(TEMPSTOREINTERVAL);
-  timerGetTemp.setInterval((min(TEMPSHOWINTERVAL, TEMPSTOREINTERVAL) - 1) / TEMPAVERAGEN);
+  timerStoreTemp.setInterval(TEMPSTOREINTERVALDEFAULT);
+  timerGetTemp.setInterval((min(TEMPSHOWINTERVAL, TEMPSTOREINTERVALDEFAULT) - 1) / TEMPAVERAGEN);
   #ifdef DISPLAYDIMENABLED
     timerDisplayDim.setTimeout(displayDimTimeout);
     dimEnabled = true;
@@ -247,11 +247,13 @@ void updateDimTimer() {
 }
 
 void incrementSettingSelected(int8_t dir) {
-    int8_t newCur = settingsOptsDimmingCur + dir;
-    settingsOptsDimmingCur = newCur < 0 ? (SETTINGSOPTSDIMMINGSIZE-1) : (newCur % SETTINGSOPTSDIMMINGSIZE);
+    if (settingSelected == 0)
+      settingsOptsDimmingCur = (settingsOptsDimmingCur + dir) < 0 ? (SETTINGSOPTSDIMMINGSIZE-1) : ((settingsOptsDimmingCur + dir) % SETTINGSOPTSDIMMINGSIZE);
+    else if (settingSelected == 1)
+      settingsOptsGraphCur = (settingsOptsGraphCur + dir) < 0 ? (SETTINGSOPTSGRAPHSIZE-1) : ((settingsOptsGraphCur + dir) % SETTINGSOPTSGRAPHSIZE);
 }
 void acceptSettingsSelected() {
-  // Serial.println("accept");
+  // changing dimming interval
   if (settingSelected == 0) {
     dimEnabled = true;
     if (settingsOptsDimmingCur == 1) timerDisplayDim.setInterval(5000);
@@ -265,7 +267,20 @@ void acceptSettingsSelected() {
       forceMenuRedraw = true;
       updateDimTimer();
     }
-  } else {
+  }
+  // changing graph timeout setting
+  else if (settingSelected == 1) {
+    if (settingsOptsGraphCur == 1) timerStoreTemp.setInterval(500);
+    else if (settingsOptsGraphCur == 2) timerStoreTemp.setInterval(1000);
+    else if (settingsOptsGraphCur == 3) timerStoreTemp.setInterval(5000);
+    else if (settingsOptsGraphCur == 4) timerStoreTemp.setInterval(15000);
+    else if (settingsOptsGraphCur == 5) timerStoreTemp.setInterval(30000);
+    else if (settingsOptsGraphCur == 6) timerStoreTemp.setInterval(60000);
+    else if (settingsOptsGraphCur == 7) timerStoreTemp.setInterval(120000);
+    else if (settingsOptsGraphCur == 8) timerStoreTemp.setInterval(600000);
+    else timerStoreTemp.setInterval(250);
+    
+    timerStoreTemp.start();
   }
 }
 
@@ -280,7 +295,7 @@ void displayLive(bool forceMenuRedraw) {
   forceMenuRedraw = true;
   
   // calc averaged value of temperature
-  dtostrf(temp, 6, 2, tempStrBuf);
+  dtostrf(therm.computeTemp(tempValPartAverage), 6, 2, tempStrBuf);
   
   display.clearDisplay();
   
@@ -311,21 +326,22 @@ void displayGraph(bool forceMenuRedraw) {
 
     // do not show min/max until first storage iteration updates its default values
     if (cycled || curs > 0) {
-      display.print(temp);
+      dtostrf(therm.computeTemp(tempValPartAverage), 6, 2, tempStrBuf);
+      display.print(tempStrBuf);
       display.print(" ");
       byte curX = display.getCursorX();
       display.print("l:");
-      dtostrf(measMin, 6, 2, tempStrBuf);
+      dtostrf(measMin, 5, 1, tempStrBuf);
       display.print(tempStrBuf);
       display.print(" ");
-      dtostrf(measMax, 6, 2, tempStrBuf);
+      dtostrf(measMax, 5, 1, tempStrBuf);
       display.print(tempStrBuf);
       display.setCursor(curX, 8);
       display.print("g:");
-      dtostrf(measMinG, 6, 2, tempStrBuf);
+      dtostrf(measMinG, 5, 1, tempStrBuf);
       display.print(tempStrBuf);
       display.print(" ");
-      dtostrf(measMaxG, 6, 2, tempStrBuf);
+      dtostrf(measMaxG, 5, 1, tempStrBuf);
       display.print(tempStrBuf);
     }
   }
@@ -340,11 +356,11 @@ void displayGraph(bool forceMenuRedraw) {
     byte i = cycled ? (curs + 1) : 0;
     byte prevX = 0;
     // constrain is needed to correctly fit into screen
-    byte prevY = SCREEN_HEIGHT - GRAPHPADDINGBOT - (measData[(i < MEASDATALENGTH ? i : 0)] - measMinB) * scale;
+    byte prevY = SCREEN_HEIGHT - GRAPHPADDINGBOT - (measData[(i < MEASDATALENGTH ? i : 0)] - measMin8) * scale;
     for (byte x = 1;; i++, x++) {
       if (i == MEASDATALENGTH) i = 0;  // wrap around i
       if (i == curs) break;  // stop condition
-      byte y = SCREEN_HEIGHT - GRAPHPADDINGBOT - (measData[i] - measMinB) * scale;
+      byte y = SCREEN_HEIGHT - GRAPHPADDINGBOT - (measData[i] - measMin8) * scale;
       display.drawLine(prevX, prevY, x, y, SSD1306_WHITE);
       prevX = x;
       prevY = y;
@@ -415,6 +431,7 @@ void storeMeasurement() {
   // reset partial average variables
   tempValPartAverage = 0;
   tempValN = 0;
+  measurePartial();
   
   // check, if are going to overrid min or max value
   bool recalcMin = curs == measMinInd;
@@ -482,9 +499,9 @@ void storeMeasurement() {
     }
   }
   if (recalcMin || recalcMax || recalcRange) {
-    measMinB = measMin;
-    float range = measMax - measMin;
-    if (range >= 0.5f) scale = (DISPLAYDATAHEIGHT - 1 - (GRAPHPADDINGTOP + GRAPHPADDINGBOT)) / range;  // use this for aligning graph vertically to the center
+    measMin8 = measMin;
+    int8_t range = (int8_t)measMax - measMin8;
+    if (range >= 1) scale = (float)(DISPLAYDATAHEIGHT - 1 - (GRAPHPADDINGTOP + GRAPHPADDINGBOT)) / range;  // use this for aligning graph vertically to the center
     else scale = 2.f;
     
     // Serial.print("; scale: ");
