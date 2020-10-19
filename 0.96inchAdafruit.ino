@@ -2,9 +2,10 @@
 #define TEMPSHOWINTERVAL 500
 #define TEMPSTOREINTERVAL 500
 #define TEMPAVERAGEN 20  // [0..255] - number of intermediate measurements
-#define MEASDATALENGTH 64
+#define MEASDATALENGTH 32
 
-#define DISPLAYDIMTIMEOUT 0
+#define DISPLAYDIMTIMEOUTDEFAULT 15000
+// #define DISPLAYDIMENABLED  // uncomment this to enable
 
 
 //#define EEPROMMEASBITS 5  // [1..8] - how many bits to use for each measurement when storing in EEPROM
@@ -19,6 +20,9 @@
 #define BTNLEFT_PIN 3
 #define BTNRIGHT_PIN 2
 #define OLED_RESET -1 // Reset pin # (or -1 if sharing Arduino reset pin)
+#define BTNDEBOUNCE 40
+#define BTNCLICKTIMEOUT 250  // timeout between consequent clicks
+#define BTNHOLDTIMEOUT 500  // timeout for holding a button
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -50,6 +54,7 @@ GTimer timerStoreTemp;
 GTimer timerDisplayDim;
 
 char tempStrBuf[6];
+bool dimEnabled;
 bool isDimmed = false;
 
 // temperature variables
@@ -73,12 +78,14 @@ float scale = 2.f;
 
 // Menu variables
 byte menuScreen = 1;  // 0 - live temp, 1 - graph, 2 - settings
+bool forceMenuRedraw = false;  // can be set to force display methods to redraw. (display methods unset this flag!)
 byte settingSelected = 0;
 byte settingIsChanging = false;
-char* settingsOptsDimming[] = {"off", "5s", "10s", "15s"};
-#define SETTINGSOPTSDIMMINGSIZE 4
+// https://www.arduino.cc/reference/en/language/variables/utilities/progmem/
+const char* const PROGMEM settingsOptsDimming[] = {"off ", " 5s ", "10s ", "15s ", "30s ", "60s "};
+#define SETTINGSOPTSDIMMINGSIZE 6
 byte settingsOptsDimmingCur = 0;
-char* settingsOptsGraph[] = {"0.5s", "1s", "5s", "15s", "30s", "1m", "2m", "5m"};
+const char* const PROGMEM settingsOptsGraph[] = {"0.5s", "1s ", "5s ", "15s ", "30s ", " 1m ", " 2m ", " 5m "};
 #define SETTINGSOPTSGRAPHSIZE 8
 byte settingsOptsGraphCur = 0;
 
@@ -94,18 +101,14 @@ byte settingsOptsGraphCur = 0;
 void setup() {
   Serial.begin(57600);
 
-  // Serial.print("DISPLAYDATAHEIGHT: ");
-  // Serial.println(DISPLAYDATAHEIGHT);
+  // Serial.print("displayDimTimeout: ");
+  // Serial.println(displayDimTimeout);
   // Serial.print("GRAPHYOFFSET: ");
   // Serial.println(GRAPHYOFFSET);
 
   initDisplay();
-
-  timerShowTemp.setInterval(TEMPSHOWINTERVAL);
-  timerStoreTemp.setInterval(TEMPSTOREINTERVAL);
-  timerGetTemp.setInterval((min(TEMPSHOWINTERVAL, TEMPSTOREINTERVAL) - 1) / TEMPAVERAGEN);
-  
-  if (DISPLAYDIMTIMEOUT > 0) timerDisplayDim.setTimeout(DISPLAYDIMTIMEOUT);
+  initButtons();
+  initTimers();
 }
 
 void loop() {
@@ -116,60 +119,63 @@ void loop() {
   if (timerGetTemp.isReady()) {
     measurePartial();
   }
-
   // store averaged value in array
   if (timerStoreTemp.isReady()) {
     storeMeasurement();    
   }
 
-  bool menuJustChanged = false;
   if (btnL.isSingle()) {
+    // Serial.println("btnL");
     // if button has been pushed while active (not sleeping)
-    if (!dimActionPerformed()) {
+    if (!displayWakeUp()) {
       // if settings screen
       if (menuScreen == 2) {
           // if in process of changing settings
           if (settingIsChanging) {
-            settingIsChanging = false;
+            incrementSettingSelected(-1);
           }
           // if not changing settings atm
           else {
+            // Serial.println("btnL -> not changing");
             settingSelected = (settingSelected + 1) % 2;
           }
-          menuJustChanged = true;
-      }
-    }
-  }
-  if (btnL.isHolded()) {
-    // if settings screen
-    if (menuScreen == 2) {
-      // if not changing
-      if (!settingIsChanging) {
-        settingIsChanging = true;
-        menuJustChanged = true;
+          forceMenuRedraw = true;
       }
     }
   }
   if (btnR.isSingle()) {
-    if (!dimActionPerformed()) {
+    // Serial.println("btnR");
+    if (!displayWakeUp()) {
+      if (menuScreen == 2) {
       // if in process of changing settings
-      if (menuScreen == 2 && settingIsChanging) {
-        incrementSettingSelected();
+        if (settingIsChanging) {
+          incrementSettingSelected(1);
+        } else {
+          menuScreen = (menuScreen + 1) % 3;
+        }
       }
       // if not changing settings
       else {
         menuScreen = (menuScreen + 1) % 3;
       }
-      menuJustChanged = true;
+      forceMenuRedraw = true;
+    }
+  }
+  if (btnL.isHolded()) {
+    // if settings screen
+    if (menuScreen == 2) {
+      acceptSettingsSelected();
+      settingIsChanging = !settingIsChanging;
+      forceMenuRedraw = true;
     }
   }
 
   if (menuScreen == 0) {
-    displayLive(menuJustChanged);
+    displayLive(forceMenuRedraw);
   } else if (menuScreen == 1) {
-    displayGraph(menuJustChanged);
+    displayGraph(forceMenuRedraw);
   } else {
-    displaySettings(menuJustChanged);
+    displaySettings(forceMenuRedraw);
   }
 
   if (timerDisplayDim.isReady()) {
@@ -192,10 +198,27 @@ void initDisplay() {
   delay(500);
   display.clearDisplay();
 }
+void initButtons() {
+  btnL.setDebounce(BTNDEBOUNCE);
+  btnR.setDebounce(BTNDEBOUNCE);
+  btnL.setClickTimeout(BTNCLICKTIMEOUT);
+  btnR.setClickTimeout(BTNCLICKTIMEOUT);
+  btnL.setTimeout(BTNHOLDTIMEOUT);
+  btnR.setTimeout(BTNHOLDTIMEOUT);
+}
+void initTimers() {
+  timerShowTemp.setInterval(TEMPSHOWINTERVAL);
+  timerStoreTemp.setInterval(TEMPSTOREINTERVAL);
+  timerGetTemp.setInterval((min(TEMPSHOWINTERVAL, TEMPSTOREINTERVAL) - 1) / TEMPAVERAGEN);
+  #ifdef DISPLAYDIMENABLED
+    timerDisplayDim.setTimeout(displayDimTimeout);
+    dimEnabled = true;
+  #endif
+}
 
 // either wakes arduino up and resets dimTimeout, or just resets timeout.
 // returns true, if woke up, false, if only timeout has been reset
-bool dimActionPerformed() {
+bool displayWakeUp() {
   if (isDimmed) {
     dim(false);
     return true;
@@ -206,8 +229,9 @@ bool dimActionPerformed() {
 }
 // either turns dim on or off
 void dim(bool v) {
-  if (DISPLAYDIMTIMEOUT == 0) return;
+  if (!dimEnabled) return;
   if (!v) {
+    Serial.println(F("cl"));
     updateDimTimer();
     // clear display to not have any flashing screens
     display.clearDisplay();
@@ -218,26 +242,42 @@ void dim(bool v) {
 }
 // resets timeout 
 void updateDimTimer() {
-  if (DISPLAYDIMTIMEOUT == 0) return;
+  if (!dimEnabled) return;
   timerDisplayDim.start();
 }
 
-void incrementSettingSelected() {
+void incrementSettingSelected(int8_t dir) {
+    int8_t newCur = settingsOptsDimmingCur + dir;
+    settingsOptsDimmingCur = newCur < 0 ? (SETTINGSOPTSDIMMINGSIZE-1) : (newCur % SETTINGSOPTSDIMMINGSIZE);
+}
+void acceptSettingsSelected() {
+  // Serial.println("accept");
   if (settingSelected == 0) {
-    settingsOptsDimmingCur = (settingsOptsDimmingCur + 1) % SETTINGSOPTSDIMMINGSIZE;
+    dimEnabled = true;
+    if (settingsOptsDimmingCur == 1) timerDisplayDim.setInterval(5000);
+    else if (settingsOptsDimmingCur == 2) timerDisplayDim.setInterval(10000);
+    else if (settingsOptsDimmingCur == 3) timerDisplayDim.setInterval(15000);
+    else if (settingsOptsDimmingCur == 4) timerDisplayDim.setInterval(30000);
+    else if (settingsOptsDimmingCur == 5) timerDisplayDim.setInterval(60000);
+    else dimEnabled = false;
+
+    if (dimEnabled) {
+      forceMenuRedraw = true;
+      updateDimTimer();
+    }
   } else {
-    settingsOptsGraphCur = (settingsOptsGraphCur + 1) % SETTINGSOPTSGRAPHSIZE;
   }
 }
 
 // show live temperature on display
-void displayLive(bool menuJustChanged) {
+void displayLive(bool forceMenuRedraw) {
   // do not waste cpu if display is isDimmed
   if (isDimmed) return;
 
   // skip execution until show timer is ready
-  if (!menuJustChanged && !timerShowTemp.isReady())
+  if (!forceMenuRedraw && !timerShowTemp.isReady())
     return;
+  forceMenuRedraw = true;
   
   // calc averaged value of temperature
   dtostrf(temp, 6, 2, tempStrBuf);
@@ -258,11 +298,11 @@ void displayLive(bool menuJustChanged) {
   display.display();
 }
 
-void displayGraph(bool menuJustChanged) {
+void displayGraph(bool forceMenuRedraw) {
   if (isDimmed) return;
 
   /* === draw caption === */
-  if (timerShowTemp.isReady() || menuJustChanged) {
+  if (timerShowTemp.isReady() || forceMenuRedraw) {
     display.fillRect(0, 0, SCREEN_WIDTH, DISPLAYPADDINGTOP, SSD1306_BLACK);
 
     display.setCursor(0, 0);
@@ -291,7 +331,7 @@ void displayGraph(bool menuJustChanged) {
   }
 
   /* === draw graph === */
-  if (measChanged || menuJustChanged) {
+  if (measChanged || forceMenuRedraw) {
     // update graph if new data exists or forced by menyJustChanged
     measChanged = false;
     display.fillRect(0, DISPLAYPADDINGTOP, SCREEN_WIDTH, DISPLAYDATAHEIGHT, SSD1306_BLACK);
@@ -311,39 +351,56 @@ void displayGraph(bool menuJustChanged) {
     }
   }
 
+  forceMenuRedraw = true;
   display.display();
 }
-void displaySettings(bool menuJustChanged) {
+void displaySettings(bool forceMenuRedraw) {
   if (isDimmed) return;
 
-  if (menuJustChanged) {
+  if (forceMenuRedraw) {
     display.clearDisplay();
     display.setTextSize(1);
 
     // dimming timeout
-    display.setCursor(0, DISPLAYPADDINGTOP);
-    if (!settingIsChanging && settingSelected == 0) display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-    else display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-    display.print("      Dimming:");
+    display.setCursor(0, DISPLAYPADDINGTOP+1);
+    if (!settingIsChanging && settingSelected == 0) {
+      display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+      display.drawRect(display.getCursorX(),display.getCursorY()-1, 15*5, 10, SSD1306_WHITE);
+    }
+    else {
+      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    }
+    display.print(F("       Dimming:"));
     display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
     display.print(" ");
-    if (settingIsChanging && settingSelected == 0) display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-    else display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-    display.print(settingsOptsDimming[settingsOptsDimmingCur]);
+    if (settingIsChanging && settingSelected == 0) {
+      display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+      display.drawRect(display.getCursorX(),display.getCursorY()-1, 4*5, 10, SSD1306_WHITE);
+    } else {
+      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    }
+    display.print((char*)pgm_read_word(&(settingsOptsDimming[settingsOptsDimmingCur])));
     
-    display.setCursor(0, DISPLAYPADDINGTOP + 10);
+    display.setCursor(0, (DISPLAYPADDINGTOP+1) + 12);
     display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-    if (!settingIsChanging && settingSelected == 1) display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-    else display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-    display.print("Graph timeout:");
+    if (!settingIsChanging && settingSelected == 1) {
+      display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+    } else {
+      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    }
+    display.print(F(" Graph timeout:"));
     display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
     display.print(" ");
-    if (settingIsChanging && settingSelected == 1) display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-    else display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-    display.print(settingsOptsGraph[settingsOptsGraphCur]);
+    if (settingIsChanging && settingSelected == 1) {
+      display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+    } else {
+      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    }
+    display.print((char*)pgm_read_word(&(settingsOptsGraph[settingsOptsGraphCur])));
     
     display.display();
   }
+  forceMenuRedraw = true;
 }
 
 void measurePartial() {
