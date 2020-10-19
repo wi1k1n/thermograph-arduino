@@ -159,43 +159,53 @@ void displayLive(bool menuJustChanged) {
   display.display();
 }
 void displayGraph(bool menuJustChanged) {
+  /* === draw caption === */
   if (timerShowTemp.isReady()) {
-    display.clearDisplay();
-    
-    /* === draw caption === */
+    display.fillRect(0, 0, SCREEN_WIDTH, DISPLAYPADDINGTOP, SSD1306_BLACK);
+
     display.setCursor(0, 0);
     display.setTextColor(SSD1306_WHITE);  // Draw white text
-    display.setTextSize(2);
-    display.print(temp);
-  }
+    display.setTextSize(1);
 
-  // skip execution if no new data or not forced by menyJustChanged
-  if (!measChanged && !menuJustChanged) return;
-  measChanged = false;
+    display.print(temp);
+    display.print(" [");
+    display.print(measMin);
+    display.print(", ");
+    display.print(measMax);
+    display.print("]");
+  }
 
   /* === draw graph === */
-  // i iterates from 0 to cursor (or from cursor+1 up to cursor, wrapping around the MEASDATALENGTH)
-  byte i = cycled ? (curs + 1) : 0;
-  // Serial.print("curs: ");
-  // Serial.print(curs);
-  // Serial.print("; i: ");
-  // Serial.println(i);
-  byte prevX = 0;
-  // constrain is needed to correctly fit into screen
-  byte prevY = constrain((measData[0] - measMin) * scale, 0, DISPLAYDATAHEIGHT - 1) + DISPLAYPADDINGTOP;
-  for (byte x = 1;; i++, x++) {
-    if (i == MEASDATALENGTH) i = 0;  // wrap around i
-    if (i == curs) break;  // stop condition
-    byte y = constrain((measData[i] - measMin) * scale, 0, DISPLAYDATAHEIGHT - 1) + DISPLAYPADDINGTOP;
-    // Serial.println(y);
-    display.drawLine(prevX, prevY, x, y, SSD1306_WHITE);
-    prevX = x;
-    prevY = y;
+  if (measChanged || menuJustChanged) {
+    // update graph if new data exists or forced by menyJustChanged
+    measChanged = false;
+    display.fillRect(0, DISPLAYPADDINGTOP, SCREEN_WIDTH, DISPLAYDATAHEIGHT, SSD1306_BLACK);
+
+    // i iterates from 0 to cursor (or from cursor+1 up to cursor, wrapping around the MEASDATALENGTH)
+    byte i = cycled ? (curs + 1) : 0;
+    // Serial.print("curs: ");
+    // Serial.print(curs);
+    // Serial.print("; i: ");
+    // Serial.println(i);
+    byte prevX = 0;
+    // constrain is needed to correctly fit into screen
+    byte prevY = (measData[0] - measMin) * scale + DISPLAYPADDINGTOP;
+    for (byte x = 1;; i++, x++) {
+      if (i == MEASDATALENGTH) i = 0;  // wrap around i
+      if (i == curs) break;  // stop condition
+      byte y = (measData[i] - measMin) * scale + DISPLAYPADDINGTOP;
+      // Serial.print(measData[i]);
+      // Serial.print(" -> ");
+      // Serial.println(y);
+      display.drawLine(prevX, prevY, x, y, SSD1306_WHITE);
+      prevX = x;
+      prevY = y;
+    }
+    // Serial.print(" -> ");
+    // Serial.println(i);
+    
+    display.display();
   }
-  // Serial.print(" -> ");
-  // Serial.println(i);
-  
-  display.display();
 }
 void displaySettings() {
   display.clearDisplay();
@@ -228,8 +238,8 @@ void storeMeasurement() {
     measMin = temp;
     measMinInd = curs;
     byte range = measMax - measMin;
-    if (range > 0) scale = DISPLAYDATAHEIGHT / range;
-    Serial.print("minUpd: ");
+    if (range > 0) scale = (DISPLAYDATAHEIGHT - 1) / range;
+    Serial.print("measMin: ");
     Serial.print(measMin);
     Serial.print("; scale: ");
     Serial.println(scale);
@@ -238,8 +248,8 @@ void storeMeasurement() {
     measMax = temp;
     measMaxInd = curs;
     byte range = measMax - measMin;
-    if (range > 0) scale = DISPLAYDATAHEIGHT / range;
-    Serial.print("maxUpd: ");
+    if (range > 0) scale = (DISPLAYDATAHEIGHT - 1) / range;
+    Serial.print("measMax: ");
     Serial.print(measMax);
     Serial.print("; scale: ");
     Serial.println(scale);
