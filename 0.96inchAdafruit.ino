@@ -22,7 +22,8 @@
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 #define DISPLAYPADDINGTOP 16
-#define DISPLAYDATAHEIGHT SCREEN_HEIGHT-DISPLAYPADDINGTOP
+#define DISPLAYDATAHEIGHT 64-16  // SCREEN_HEIGHT - DISPLAYPADDINGTOP
+#define GRAPHYOFFSET (64 - 16) / 2  // DISPLAYDATAHEIGHT / 2
 
 #include <SPI.h>
 #include <Wire.h>
@@ -81,8 +82,10 @@ byte menuState = 1;  // 0 - live temp, 1 - graph, 2 - settings
 void setup() {
   Serial.begin(9600);
 
-  // Serial.print("MEASDATALENGTH: ");
-  // Serial.println(MEASDATALENGTH);
+  // Serial.print("DISPLAYDATAHEIGHT: ");
+  // Serial.println(DISPLAYDATAHEIGHT);
+  // Serial.print("GRAPHYOFFSET: ");
+  // Serial.println(GRAPHYOFFSET);
 
   initDisplay();
 
@@ -218,11 +221,13 @@ void displayGraph(bool menuJustChanged) {
     byte prevX = 0;
     // constrain is needed to correctly fit into screen
     byte prevY = (measData[(i < MEASDATALENGTH ? i : 0)] - measMinB) * scale + DISPLAYPADDINGTOP;
+    // byte prevY = (measData[(i < MEASDATALENGTH ? i : 0)] - measMinB) * scale + DISPLAYPADDINGTOP + GRAPHYOFFSET;  // use this for aligning graph vertically to the center
     // Serial.println(measData[i]);
     for (byte x = 1;; i++, x++) {
       if (i == MEASDATALENGTH) i = 0;  // wrap around i
       if (i == curs) break;  // stop condition
       byte y = (measData[i] - measMinB) * scale + DISPLAYPADDINGTOP;
+      // byte y = (measData[i] - measMinB) * scale + DISPLAYPADDINGTOP + GRAPHYOFFSET;  // use this for aligning graph vertically to the center
       // Serial.print(measData[i]);
       // Serial.print(" -> ");
       // Serial.println(y);
@@ -262,6 +267,7 @@ void storeMeasurement() {
   
   bool recalcMin = curs == measMinInd;
   bool recalcMax = curs == measMaxInd;
+  bool recalcRange = false;
 
   // store
   measData[curs] = temp;
@@ -269,11 +275,9 @@ void storeMeasurement() {
   // update min/max and scale variables
   if (temp < measMin) {
     measMin = temp;
-    measMinB = measMin;
     measMinInd = curs;
-    float range = measMax - measMin;
-    if (range >= 1) scale = (DISPLAYDATAHEIGHT - 1) / range;
     recalcMin = false;
+    recalcRange = true;
     // Serial.print("measMin: ");
     // Serial.print(measMin);
     // Serial.print("; scale: ");
@@ -282,13 +286,12 @@ void storeMeasurement() {
   if (temp > measMax) {
     measMax = temp;
     measMaxInd = curs;
-    float range = measMax - measMin;
-    if (range >= 1) scale = (DISPLAYDATAHEIGHT - 1) / range;
     recalcMax = false;
-  //   Serial.print("measMax: ");
-  //   Serial.print(measMax);
-  //   Serial.print("; scale: ");
-  //   Serial.println(scale);
+    recalcRange = true;
+    // Serial.print("measMax: ");
+    // Serial.print(measMax);
+    // Serial.print("; scale: ");
+    // Serial.println(scale);
   }
   // update global min/max
   if (temp < measMinG) measMinG = temp;
@@ -306,6 +309,7 @@ void storeMeasurement() {
 
   // recalc min/max if needed
   if (recalcMin) {
+    recalcRange = true;
     measMin = INT32_MAX;
     byte i = cycled ? (curs + 1) : 0;
     for (;; i++) {
@@ -318,6 +322,7 @@ void storeMeasurement() {
     }
   }
   if (recalcMax) {
+    recalcRange = true;
     measMax = INT32_MIN;
     byte i = cycled ? (curs + 1) : 0;
     for (;; i++) {
@@ -329,9 +334,10 @@ void storeMeasurement() {
       }
     }
   }
-  if (recalcMin || recalcMax) {
+  if (recalcMin || recalcMax || recalcRange) {
     measMinB = measMin;
     float range = measMax - measMin;
+    // if (range >= 1) scale = (GRAPHYOFFSET - 1) / range;  // use this for aligning graph vertically to the center
     if (range >= 1) scale = (DISPLAYDATAHEIGHT - 1) / range;
   }
 }
