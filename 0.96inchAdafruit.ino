@@ -49,6 +49,7 @@ float tempValPartAverage;  // partially averaged value of analogRead(thermistor)
 byte tempValN = 0;  // number of currently got measurements
 // TODO: change this to int8 in a correct way
 float temp;  // degrees of Celsium
+char tempStrBuf[6];
 
 int8_t measData[MEASDATALENGTH];
 byte curs = 0;
@@ -148,18 +149,20 @@ void displayLive(bool menuJustChanged) {
       t = measData[(curs == 0 ? MEASDATALENGTH : curs) - 1];
     else
       t = therm.computeTemp(tempValPartAverage);
+    dtostrf(t, 6, 2, tempStrBuf);
   
 //  Serial.print("showTemp:  ");
 //  Serial.println(temp);
   
   display.clearDisplay();
   
-  display.setCursor(0, DISPLAYPADDINGTOP);
+  // char size at scale 1 is 5x8. 6 digits and font_scale=3
+  display.setCursor((SCREEN_WIDTH - 6*5*3) / 2, DISPLAYPADDINGTOP + 6);
   display.setTextColor(SSD1306_WHITE);  // Draw white text
   display.setTextSize(3);
   display.print(t);
 
-  display.setCursor(display.getCursorX(), DISPLAYPADDINGTOP - 4);
+  display.setCursor(display.getCursorX(), display.getCursorY() - 4);
   display.setTextSize(2);
   display.print('o');
 
