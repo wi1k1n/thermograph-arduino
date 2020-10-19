@@ -1,7 +1,7 @@
 // Settings constants
-#define TEMPSHOWINTERVAL 250
-#define TEMPSTOREINTERVAL 250
-#define TEMPAVERAGEN 10  // [0..255] - number of intermediate measurements
+#define TEMPSHOWINTERVAL 500
+#define TEMPSTOREINTERVAL 500
+#define TEMPAVERAGEN 20  // [0..255] - number of intermediate measurements
 
 #define MEASDATALENGTH 128
 
@@ -54,10 +54,13 @@ int8_t measData[MEASDATALENGTH];
 byte curs = 0;
 bool cycled = false;
 bool measChanged = true;
-int8_t measMin = INT8_MAX;
+float measMin = INT32_MAX;
+float measMax = INT32_MIN;
+float measMinG = INT32_MAX;
+float measMaxG = INT32_MIN;
+byte measMinB = INT8_MAX;
 byte measMinInd = 0;
 byte measMaxInd = 0;
-int8_t measMax = INT8_MIN;
 byte scale = 1;
 
 
@@ -77,8 +80,8 @@ byte menuState = 1;  // 0 - live temp, 1 - graph, 2 - settings
 void setup() {
   Serial.begin(9600);
 
-  Serial.print("MEASDATALENGTH: ");
-  Serial.println(MEASDATALENGTH);
+  // Serial.print("MEASDATALENGTH: ");
+  // Serial.println(MEASDATALENGTH);
 
   initDisplay();
 
@@ -123,14 +126,13 @@ void initDisplay() {
     Serial.println(F("SSD1306 allocation failed"));
     for(;;); // Don't proceed, loop forever
   }
+
+  display.cp437(true);  // Use full 256 char 'Code Page 437' font
   
   // Show initial display buffer contents on the screen --
   // the library initializes this with an Adafruit splash screen.
   display.display();
-  delay(1000);
-  
-  display.cp437(true);  // Use full 256 char 'Code Page 437' font
-  // Clear the buffer
+  delay(500);
   display.clearDisplay();
 }
 
@@ -141,7 +143,11 @@ void displayLive(bool menuJustChanged) {
     return;
   
   // calc averaged value of temperature
-  temp = tempValN == 0 ? measData[curs - 1] : temp;
+    float t;
+    if (tempValN == 0)
+      t = measData[(curs == 0 ? MEASDATALENGTH : curs) - 1];
+    else
+      t = therm.computeTemp(tempValPartAverage);
   
 //  Serial.print("showTemp:  ");
 //  Serial.println(temp);
@@ -151,28 +157,46 @@ void displayLive(bool menuJustChanged) {
   display.setCursor(0, DISPLAYPADDINGTOP);
   display.setTextColor(SSD1306_WHITE);  // Draw white text
   display.setTextSize(3);
-  display.print(temp);
+  display.print(t);
 
   display.setCursor(display.getCursorX(), DISPLAYPADDINGTOP - 4);
   display.setTextSize(2);
   display.print('o');
+
   display.display();
 }
+
 void displayGraph(bool menuJustChanged) {
   /* === draw caption === */
-  if (timerShowTemp.isReady()) {
+  if (timerShowTemp.isReady() || menuJustChanged) {
     display.fillRect(0, 0, SCREEN_WIDTH, DISPLAYPADDINGTOP, SSD1306_BLACK);
 
     display.setCursor(0, 0);
     display.setTextColor(SSD1306_WHITE);  // Draw white text
     display.setTextSize(1);
 
-    display.print(temp);
-    display.print(" [");
-    display.print(measMin);
-    display.print(", ");
-    display.print(measMax);
-    display.print("]");
+    // do not show min/max until first storage iteration updates its default values
+    if (cycled || curs > 0) {
+      float t;
+      if (tempValN == 0)
+        t = measData[(curs == 0 ? MEASDATALENGTH : curs) - 1];
+      else
+        t = therm.computeTemp(tempValPartAverage);
+
+      display.print(t);
+      display.print(" ");
+      byte curX = display.getCursorX();
+      display.print("l:");
+      display.print(measMin);
+      display.print(" ");
+      display.print(measMax);
+      // display.print(")");
+      display.setCursor(curX, 8);
+      display.print("g:");
+      display.print(measMinG);
+      display.print(" ");
+      display.print(measMaxG);
+    }
   }
 
   /* === draw graph === */
@@ -186,14 +210,16 @@ void displayGraph(bool menuJustChanged) {
     // Serial.print("curs: ");
     // Serial.print(curs);
     // Serial.print("; i: ");
-    // Serial.println(i);
+    // Serial.print(i);
+    // Serial.print("; measData[i]: ");
     byte prevX = 0;
     // constrain is needed to correctly fit into screen
-    byte prevY = (measData[0] - measMin) * scale + DISPLAYPADDINGTOP;
+    byte prevY = (measData[(i < MEASDATALENGTH ? i : 0)] - measMinB) * scale + DISPLAYPADDINGTOP;
+    // Serial.println(measData[i]);
     for (byte x = 1;; i++, x++) {
       if (i == MEASDATALENGTH) i = 0;  // wrap around i
       if (i == curs) break;  // stop condition
-      byte y = (measData[i] - measMin) * scale + DISPLAYPADDINGTOP;
+      byte y = (measData[i] - measMinB) * scale + DISPLAYPADDINGTOP;
       // Serial.print(measData[i]);
       // Serial.print(" -> ");
       // Serial.println(y);
@@ -203,9 +229,9 @@ void displayGraph(bool menuJustChanged) {
     }
     // Serial.print(" -> ");
     // Serial.println(i);
-    
-    display.display();
   }
+
+  display.display();
 }
 void displaySettings() {
   display.clearDisplay();
@@ -231,29 +257,41 @@ void storeMeasurement() {
   tempValPartAverage = 0;
   tempValN = 0;
   
+  bool recalcMin = curs == measMinInd;
+  bool recalcMax = curs == measMaxInd;
+
   // store
   measData[curs] = temp;
   
-  if ((int)temp < measMin) {
+  // update min/max and scale variables
+  if (temp < measMin) {
     measMin = temp;
+    measMinB = measMin;
     measMinInd = curs;
-    byte range = measMax - measMin;
-    if (range > 0) scale = (DISPLAYDATAHEIGHT - 1) / range;
-    Serial.print("measMin: ");
-    Serial.print(measMin);
-    Serial.print("; scale: ");
-    Serial.println(scale);
+    float range = measMax - measMin;
+    if (range >= 1) scale = (DISPLAYDATAHEIGHT - 1) / range;
+    recalcMin = false;
+    // Serial.print("measMin: ");
+    // Serial.print(measMin);
+    // Serial.print("; scale: ");
+    // Serial.println(scale);
   }
-  if ((int)temp > measMax) {
+  if (temp > measMax) {
     measMax = temp;
     measMaxInd = curs;
-    byte range = measMax - measMin;
-    if (range > 0) scale = (DISPLAYDATAHEIGHT - 1) / range;
-    Serial.print("measMax: ");
-    Serial.print(measMax);
-    Serial.print("; scale: ");
-    Serial.println(scale);
+    float range = measMax - measMin;
+    if (range >= 1) scale = (DISPLAYDATAHEIGHT - 1) / range;
+    recalcMax = false;
+  //   Serial.print("measMax: ");
+  //   Serial.print(measMax);
+  //   Serial.print("; scale: ");
+  //   Serial.println(scale);
   }
+  // update global min/max
+  if (temp < measMinG) measMinG = temp;
+  if (temp > measMaxG) measMaxG = temp;
+
+  // increment curs
   measChanged = true;
   if (curs == MEASDATALENGTH - 1) {
     cycled = true;
@@ -261,5 +299,36 @@ void storeMeasurement() {
     curs = 0;
   } else {
     curs++;
+  }
+
+  // recalc min/max if needed
+  if (recalcMin) {
+    measMin = INT32_MAX;
+    byte i = cycled ? (curs + 1) : 0;
+    for (;; i++) {
+      if (i == MEASDATALENGTH) i = 0;
+      if (i == curs) break;
+      if (measData[i] < measMin) {
+        measMin = measData[i];
+        measMinInd = i;
+      }
+    }
+  }
+  if (recalcMax) {
+    measMax = INT32_MIN;
+    byte i = cycled ? (curs + 1) : 0;
+    for (;; i++) {
+      if (i == MEASDATALENGTH) i = 0;
+      if (i == curs) break;
+      if (measData[i] > measMax) {
+        measMax = measData[i];
+        measMaxInd = i;
+      }
+    }
+  }
+  if (recalcMin || recalcMax) {
+    measMinB = measMin;
+    float range = measMax - measMin;
+    if (range >= 1) scale = (DISPLAYDATAHEIGHT - 1) / range;
   }
 }
