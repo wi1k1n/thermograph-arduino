@@ -1,10 +1,11 @@
+// TODO: timerGraph waits for the interval without drawing anything!
+
 // Settings constants
 #define TEMPSHOWINTERVAL 500
 #define TEMPSTOREINTERVALDEFAULT 1000
 #define TEMPAVERAGEN 20  // [0..255] - number of intermediate measurements
-#define MEASDATALENGTH 128
+#define MEASDATALENGTH 128  // bigger than SCREEN_WIDTH is not supported yet
 
-#define DISPLAYDIMTIMEOUTDEFAULT 15000
 // #define DISPLAYDIMENABLED  // uncomment this to enable
 
 
@@ -32,14 +33,12 @@
 #define GRAPHPADDINGTOP 2
 #define GRAPHPADDINGBOT 2
 
-#include <SPI.h>
-#include <Wire.h>
-#include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <GyverButton.h>
 #include <GyverTimer.h>
+#include <EEPROM.h>
+
 #include "thermistorMinim.h"
-//#include <EEPROM.h>
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
@@ -54,7 +53,6 @@ GTimer timerStoreTemp;
 GTimer timerDisplayDim;
 
 char tempStrBuf[6];
-bool dimEnabled;
 bool isDimmed = false;
 
 // temperature variables
@@ -84,7 +82,7 @@ byte settingIsChanging = false;
 // https://www.arduino.cc/reference/en/language/variables/utilities/progmem/
 const char* const PROGMEM settingsOptsDimming[] = {"off ", " 5s ", "10s ", "15s ", "30s ", "60s "};
 #define SETTINGSOPTSDIMMINGSIZE 6
-byte settingsOptsDimmingCur = 0;
+byte settingsOptsDimmingCur = 3;
 const char* const PROGMEM settingsOptsGraph[] = {".25s", ".5s ", "1s ", "5s ", "15s ", "30s ", " 1m ", " 2m ", " 5m "};
 #define SETTINGSOPTSGRAPHSIZE 9
 byte settingsOptsGraphCur = 1;
@@ -107,8 +105,12 @@ void setup() {
   // Serial.println(GRAPHYOFFSET);
 
   initDisplay();
+  initParamsFromEEPROM();
   initButtons();
   initTimers();
+  
+  delay(500);
+  display.clearDisplay();
 }
 
 void loop() {
@@ -125,7 +127,7 @@ void loop() {
   }
 
   if (btnL.isSingle()) {
-    // Serial.println("btnL");
+    // Serial.println(F("btnL"));
     // if button has been pushed while active (not sleeping)
     if (!displayWakeUp()) {
       // if settings screen
@@ -144,7 +146,7 @@ void loop() {
     }
   }
   if (btnR.isSingle()) {
-    // Serial.println("btnR");
+    // Serial.println(F("btnR"));
     if (!displayWakeUp()) {
       if (menuScreen == 2) {
       // if in process of changing settings
@@ -162,9 +164,10 @@ void loop() {
     }
   }
   if (btnL.isHolded()) {
+    // Serial.println(F("isHolded()"));
     // if settings screen
     if (menuScreen == 2) {
-      acceptSettingsSelected();
+      if (settingIsChanging) acceptSettingsSelected();
       settingIsChanging = !settingIsChanging;
       forceMenuRedraw = true;
     }
@@ -178,7 +181,7 @@ void loop() {
     displaySettings(forceMenuRedraw);
   }
 
-  if (timerDisplayDim.isReady()) {
+  if (timerDisplayDim.isReady() && !isDimmed) {
     dim(true);
   }
 }
@@ -186,17 +189,33 @@ void loop() {
 void initDisplay() {
   // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
   if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {  // 0x3c - display address
-    Serial.println(F("SSD1306 allocation failed"));
-    for(;;); // Don't proceed, loop forever
+    // Serial.println(F("SSD1306 allocation failed"));
+    pinMode(LED_BUILTIN, OUTPUT);
+    for(;;) {
+      // Don't proceed, loop forever
+      digitalWrite(LED_BUILTIN, HIGH);
+      delay(1000);
+      digitalWrite(LED_BUILTIN, LOW);
+      delay(500); 
+    }
   }
 
   display.cp437(true);  // Use full 256 char 'Code Page 437' font
   
-  // Show initial display buffer contents on the screen --
-  // the library initializes this with an Adafruit splash screen.
-  display.display();
-  delay(500);
-  display.clearDisplay();
+  display.display();  // display is initialized with Adafruit splash screen
+}
+// takes 
+void initParamsFromEEPROM() {
+  uint16_t params;
+  EEPROM.get(EEPROM.length() - 2, params);
+  // 3 bits for dim, 4 bits for graph, 2 bits for last_menu
+  settingsOptsDimmingCur = params >> 13;
+  settingsOptsGraphCur = (params >> 9) & 15;
+}
+void saveParams2EEPROM() {
+  // 3 bits for dim, 4 bits for graph
+  uint16_t params = ((settingsOptsDimmingCur << 4) | settingsOptsGraphCur) << 9;
+  EEPROM.put(EEPROM.length() - 2, params);
 }
 void initButtons() {
   btnL.setDebounce(BTNDEBOUNCE);
@@ -208,11 +227,10 @@ void initButtons() {
 }
 void initTimers() {
   timerShowTemp.setInterval(TEMPSHOWINTERVAL);
-  timerStoreTemp.setInterval(TEMPSTOREINTERVALDEFAULT);
-  timerGetTemp.setInterval((min(TEMPSHOWINTERVAL, TEMPSTOREINTERVALDEFAULT) - 1) / TEMPAVERAGEN);
-  #ifdef DISPLAYDIMENABLED
-    timerDisplayDim.setTimeout(displayDimTimeout);
-    dimEnabled = true;
+  setStoreTempTimer();
+  timerGetTemp.setInterval((min(TEMPSHOWINTERVAL, timerStoreTemp.getInterval()) - 1) / TEMPAVERAGEN);
+  #ifndef DISPLAYDIMENABLED
+    setDisplayDimTimer();
   #endif
 }
 
@@ -229,9 +247,9 @@ bool displayWakeUp() {
 }
 // either turns dim on or off
 void dim(bool v) {
-  if (!dimEnabled) return;
+  if (!timerDisplayDim.isEnabled()) return;
   if (!v) {
-    Serial.println(F("cl"));
+    // Serial.println(F("cl"));
     updateDimTimer();
     // clear display to not have any flashing screens
     display.clearDisplay();
@@ -242,7 +260,7 @@ void dim(bool v) {
 }
 // resets timeout 
 void updateDimTimer() {
-  if (!dimEnabled) return;
+  if (!timerDisplayDim.isEnabled()) return;
   timerDisplayDim.start();
 }
 
@@ -255,21 +273,30 @@ void incrementSettingSelected(int8_t dir) {
 void acceptSettingsSelected() {
   // changing dimming interval
   if (settingSelected == 0) {
-    dimEnabled = true;
-    if (settingsOptsDimmingCur == 1) timerDisplayDim.setInterval(5000);
-    else if (settingsOptsDimmingCur == 2) timerDisplayDim.setInterval(10000);
-    else if (settingsOptsDimmingCur == 3) timerDisplayDim.setInterval(15000);
-    else if (settingsOptsDimmingCur == 4) timerDisplayDim.setInterval(30000);
-    else if (settingsOptsDimmingCur == 5) timerDisplayDim.setInterval(60000);
-    else dimEnabled = false;
-
-    if (dimEnabled) {
+    setDisplayDimTimer();
+    if (timerDisplayDim.isEnabled()) {
       forceMenuRedraw = true;
       updateDimTimer();
     }
   }
   // changing graph timeout setting
   else if (settingSelected == 1) {
+    setStoreTempTimer();
+    timerStoreTemp.start();
+  }
+  saveParams2EEPROM();
+}
+
+// takes index of dimming option and sets timer with according interval
+void setDisplayDimTimer() {
+    if (settingsOptsDimmingCur == 1) timerDisplayDim.setInterval(5000);
+    else if (settingsOptsDimmingCur == 2) timerDisplayDim.setInterval(10000);
+    else if (settingsOptsDimmingCur == 3) timerDisplayDim.setInterval(15000);
+    else if (settingsOptsDimmingCur == 4) timerDisplayDim.setInterval(30000);
+    else if (settingsOptsDimmingCur == 5) timerDisplayDim.setInterval(60000);
+    else timerDisplayDim.stop();
+}
+void setStoreTempTimer() {
     if (settingsOptsGraphCur == 1) timerStoreTemp.setInterval(500);
     else if (settingsOptsGraphCur == 2) timerStoreTemp.setInterval(1000);
     else if (settingsOptsGraphCur == 3) timerStoreTemp.setInterval(5000);
@@ -279,9 +306,6 @@ void acceptSettingsSelected() {
     else if (settingsOptsGraphCur == 7) timerStoreTemp.setInterval(120000);
     else if (settingsOptsGraphCur == 8) timerStoreTemp.setInterval(600000);
     else timerStoreTemp.setInterval(250);
-    
-    timerStoreTemp.start();
-  }
 }
 
 // show live temperature on display
