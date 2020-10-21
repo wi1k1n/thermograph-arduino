@@ -30,6 +30,7 @@
 #define DISPLAYPADDINGTOP 16
 #define DISPLAYDATAHEIGHT 64-16  // SCREEN_HEIGHT - DISPLAYPADDINGTOP
 // #define GRAPHYOFFSET (64 - 16) / 2  // DISPLAYDATAHEIGHT / 2
+#define DISPLAYLOGODURATION 500
 #define GRAPHPADDINGTOP 2
 #define GRAPHPADDINGBOT 2
 
@@ -76,15 +77,15 @@ float scale = 2.f;
 
 // Menu variables
 byte menuScreen = 1;  // 0 - live temp, 1 - graph, 2 - settings
-bool forceMenuRedraw = false;  // can be set to force display methods to redraw. (display methods unset this flag!)
+bool forceMenuRedraw = true;  // can be set to force display methods to redraw. (display methods unset this flag!)
 byte settingSelected = 0;
 byte settingIsChanging = false;
 // https://www.arduino.cc/reference/en/language/variables/utilities/progmem/
 const char* const PROGMEM settingsOptsDimming[] = {"off ", " 5s ", "10s ", "15s ", "30s ", "60s "};
 #define SETTINGSOPTSDIMMINGSIZE 6
 byte settingsOptsDimmingCur = 3;
-const char* const PROGMEM settingsOptsGraph[] = {".25s", ".5s ", "1s ", "5s ", "15s ", "30s ", " 1m ", " 2m ", " 5m "};
-#define SETTINGSOPTSGRAPHSIZE 9
+const char* const PROGMEM settingsOptsGraph[] = {".25s", ".5s ", " 1s ", " 2s ", " 5s ", "10s ", "15s ", "30s ", " 1m ", " 2m ", " 5m ", "10m ", "15m "};
+#define SETTINGSOPTSGRAPHSIZE 13
 byte settingsOptsGraphCur = 1;
 
 // EEPROM management variables
@@ -107,9 +108,10 @@ void setup() {
   initDisplay();
   initParamsFromEEPROM();
   initButtons();
+  initSensors();
   initTimers();
   
-  delay(500);
+  delay(DISPLAYLOGODURATION);
   display.clearDisplay();
 }
 
@@ -123,6 +125,7 @@ void loop() {
   }
   // store averaged value in array
   if (timerStoreTemp.isReady()) {
+    // Serial.println(F("store timer ready"));
     storeMeasurement();    
   }
 
@@ -174,11 +177,11 @@ void loop() {
   }
 
   if (menuScreen == 0) {
-    displayLive(forceMenuRedraw);
+    displayLive();
   } else if (menuScreen == 1) {
-    displayGraph(forceMenuRedraw);
+    displayGraph();
   } else {
-    displaySettings(forceMenuRedraw);
+    displaySettings();
   }
 
   if (timerDisplayDim.isReady() && !isDimmed) {
@@ -224,6 +227,10 @@ void initButtons() {
   btnR.setClickTimeout(BTNCLICKTIMEOUT);
   btnL.setTimeout(BTNHOLDTIMEOUT);
   btnR.setTimeout(BTNHOLDTIMEOUT);
+}
+void initSensors() {
+  // here both are initialized and first measurement made
+  measurePartial();
 }
 void initTimers() {
   timerShowTemp.setInterval(TEMPSHOWINTERVAL);
@@ -306,17 +313,17 @@ void setStoreTempTimer() {
     else if (settingsOptsGraphCur == 7) timerStoreTemp.setInterval(120000);
     else if (settingsOptsGraphCur == 8) timerStoreTemp.setInterval(600000);
     else timerStoreTemp.setInterval(250);
+    timerStoreTemp.setReadyOnStart(true);
 }
 
 // show live temperature on display
-void displayLive(bool forceMenuRedraw) {
+void displayLive() {
   // do not waste cpu if display is isDimmed
   if (isDimmed) return;
 
   // skip execution until show timer is ready
   if (!forceMenuRedraw && !timerShowTemp.isReady())
     return;
-  forceMenuRedraw = true;
   
   // calc averaged value of temperature
   dtostrf(therm.computeTemp(tempValPartAverage), 6, 2, tempStrBuf);
@@ -334,11 +341,14 @@ void displayLive(bool forceMenuRedraw) {
   display.setTextSize(2);
   display.print('o');
 
+  forceMenuRedraw = false;
   display.display();
 }
 
-void displayGraph(bool forceMenuRedraw) {
+void displayGraph() {
   if (isDimmed) return;
+
+  // Serial.println(forceMenuRedraw);
 
   /* === draw caption === */
   if (timerShowTemp.isReady() || forceMenuRedraw) {
@@ -348,10 +358,10 @@ void displayGraph(bool forceMenuRedraw) {
     display.setTextColor(SSD1306_WHITE);  // Draw white text
     display.setTextSize(1);
 
+    dtostrf(therm.computeTemp(tempValPartAverage), 6, 2, tempStrBuf);
+    display.print(tempStrBuf);
     // do not show min/max until first storage iteration updates its default values
     if (cycled || curs > 0) {
-      dtostrf(therm.computeTemp(tempValPartAverage), 6, 2, tempStrBuf);
-      display.print(tempStrBuf);
       display.print(" ");
       byte curX = display.getCursorX();
       display.print("l:");
@@ -391,10 +401,10 @@ void displayGraph(bool forceMenuRedraw) {
     }
   }
 
-  forceMenuRedraw = true;
+  forceMenuRedraw = false;
   display.display();
 }
-void displaySettings(bool forceMenuRedraw) {
+void displaySettings() {
   if (isDimmed) return;
 
   if (forceMenuRedraw) {
@@ -440,7 +450,7 @@ void displaySettings(bool forceMenuRedraw) {
     
     display.display();
   }
-  forceMenuRedraw = true;
+  forceMenuRedraw = false;
 }
 
 void measurePartial() {
