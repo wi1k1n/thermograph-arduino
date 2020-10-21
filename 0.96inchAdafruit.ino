@@ -28,8 +28,11 @@
 #define BTNRIGHT_PIN 2
 #define OLED_RESET -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #define BTNDEBOUNCE 40
-#define BTNCLICKTIMEOUT 250  // timeout between consequent clicks
-#define BTNHOLDTIMEOUT 500  // timeout for holding a button
+#define BTNCLICKTIMEOUT 200  // timeout between consequent clicks
+#define BTNHOLDTIMEOUT 400  // timeout for holding a button
+#define BTNSTEPTIMEOUT 100  // timout between steps while holding button
+
+#define GRAPHBTNSTEPS4SPEED 15  // steps after which speed is increased by 2
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -95,6 +98,10 @@ const char* const PROGMEM settingsOptsGraph[] = {".25s", ".5s ", " 1s ", " 2s ",
 #define SETTINGSOPTSGRAPHSIZE 13  // no more than 16!
 byte settingsOptsGraphCur = 1;
 
+// graphCurs > MEASDATALENGTH  ==>  graphCurs is not active
+byte graphCurs = 255;
+byte graphCursSteps = 0;
+
 
 void setup() {
   // Serial.begin(57600);
@@ -132,8 +139,15 @@ void loop() {
     // Serial.println(F("btnL"));
     // if button has been pushed while active (not sleeping)
     if (!displayWakeUp()) {
+      // if graph screen
+      if (menuScreen == 1) {
+        // graphCursor mode active
+        if (graphCurs < MEASDATALENGTH) {
+          graphCursorMove(-1);
+        } else {}
+      }
       // if settings screen
-      if (menuScreen == 2) {
+      else if (menuScreen == 2) {
           // if in process of changing settings
           if (settingIsChanging) {
             incrementSettingSelected(-1);
@@ -144,8 +158,8 @@ void loop() {
             settingSelected = (settingSelected + 1) % SETTINGSNAMESSIZE;
             // timeoutSaveLastMenu.start(); // probably not needed
           }
-          forceMenuRedraw = true;
       }
+      forceMenuRedraw = true;
     }
   }
   if (btnR.isSingle()) {
@@ -153,7 +167,12 @@ void loop() {
     if (!displayWakeUp()) {
       // if graph screen
       if (menuScreen == 1) {
-        changeMenuScreen(1);
+        // graphCursor mode active
+        if (graphCurs < MEASDATALENGTH) {
+          graphCursorMove(1);
+        } else {
+          changeMenuScreen(1);
+        }
       }
       // if settings screen
       else if (menuScreen == 2) {
@@ -172,28 +191,87 @@ void loop() {
       forceMenuRedraw = true;
     }
   }
+  // triggers once after BTNHOLDTIMEOUT has passed
   if (btnL.isHolded()) {
-    // Serial.println(F("isHolded()"));
-    // if graph screen
-    if (menuScreen == 1) {
-
-    }
-    // if settings screen
-    else if (menuScreen == 2) {
-      settingsHoldAction();
+    if (!displayWakeUp()) {
+      // Serial.println(F("isHolded()"));
+      // if graph screen
+      if (menuScreen == 1) {
+        graphCursSteps = 0;
+        // if graphCursor mode not active
+        if (graphCurs >= MEASDATALENGTH) {
+          graphCurs = 0;
+          btnL.resetStates();
+        }
+      }
+      // if settings screen
+      else if (menuScreen == 2) {
+        settingsHoldAction();
+        timeoutSaveLastMenu.start();
+      }
       forceMenuRedraw = true;
-      timeoutSaveLastMenu.start();
     }
   }
+  if (btnR.isHolded()) {
+    if (!displayWakeUp()) {
+      if (menuScreen == 1) {
+        graphCursSteps = 0;
+      }
+    }
+  }
+
   if (btnL.isRelease()) {
-    // if settings screen
-    if (menuScreen == 2) {
-      // if button selected (currently only at index 2)
-      if (settingSelected == 2) {
-        // if holded before (not single release)
-        if (settingIsChanging) {
-          // Serial.println(F("hbr"));
-          settingIsChanging = false;
+    if (!displayWakeUp()) {
+      // if settings screen
+      if (menuScreen == 2) {
+        // if button selected (currently only at index 2)
+        if (settingSelected == 2) {
+          // if holded before (not single release)
+          if (settingIsChanging) {
+            // Serial.println(F("hbr"));
+            settingIsChanging = false;
+            forceMenuRedraw = true;
+          }
+        }
+      }
+    }
+  }
+
+  // if btnL is incremented by holding
+  if (btnL.isStep()) {
+    if (!displayWakeUp()) {
+      // if on graph screen
+      if (menuScreen == 1) {
+        // if graphCursor mode is active
+        if (graphCurs < MEASDATALENGTH) {
+          // Serial.println(btnL.getHoldClicks());
+          graphCursorMove(++graphCursSteps < GRAPHBTNSTEPS4SPEED ? -1 : -2);
+          forceMenuRedraw = true;
+        }
+      }
+    }
+  }
+  // if btnR is incremented by holding
+  if (btnR.isStep()) {
+    if (!displayWakeUp()) {
+      // if on graph screen
+      if (menuScreen == 1) {
+        // if graphCursor mode is active
+        if (graphCurs < MEASDATALENGTH) {
+          graphCursorMove(++graphCursSteps < GRAPHBTNSTEPS4SPEED ? 1 : 2);
+          forceMenuRedraw = true;
+        }
+      }
+    }
+  }
+  // both buttons are held
+  if (btnL.isHold() && btnR.isHold()) {
+    if (!displayWakeUp()) {
+      // if on graph screen
+      if (menuScreen == 1) {
+        // if graphCursor mode is active
+        if (graphCurs < MEASDATALENGTH) {
+          graphCurs = 255;
           forceMenuRedraw = true;
         }
       }
@@ -265,6 +343,8 @@ void initButtons() {
   btnR.setClickTimeout(BTNCLICKTIMEOUT);
   btnL.setTimeout(BTNHOLDTIMEOUT);
   btnR.setTimeout(BTNHOLDTIMEOUT);
+  btnL.setStepTimeout(BTNSTEPTIMEOUT);
+  btnR.setStepTimeout(BTNSTEPTIMEOUT);
 }
 void initSensors() {
   // here both are initialized and first measurement made
@@ -388,6 +468,8 @@ void setStoreTempTimer() {
     timerStoreTemp.setReadyOnStart(true);
 }
 
+
+
 // show live temperature on display
 void displayLive() {
   // do not waste cpu if display is isDimmed
@@ -417,6 +499,8 @@ void displayLive() {
   display.display();
 }
 
+
+
 void displayGraph() {
   if (isDimmed) return;
 
@@ -442,13 +526,16 @@ void displayGraph() {
       display.print(" ");
       dtostrf(measMax, 5, 1, tempStrBuf);
       display.print(tempStrBuf);
-      display.setCursor(curX, 8);
-      display.print("g:");
-      dtostrf(measMinG, 5, 1, tempStrBuf);
-      display.print(tempStrBuf);
-      display.print(" ");
-      dtostrf(measMaxG, 5, 1, tempStrBuf);
-      display.print(tempStrBuf);
+      // only draw globals if graphCursor mode is inactive
+      if (graphCurs >= MEASDATALENGTH) {
+        display.setCursor(curX, 8);
+        display.print("g:");
+        dtostrf(measMinG, 5, 1, tempStrBuf);
+        display.print(tempStrBuf);
+        display.print(" ");
+        dtostrf(measMaxG, 5, 1, tempStrBuf);
+        display.print(tempStrBuf);
+      }
     }
   }
 
@@ -473,9 +560,24 @@ void displayGraph() {
     }
   }
 
+  /* === draw cursor === */
+  if (graphCurs < MEASDATALENGTH) {
+    display.drawLine(graphCurs, DISPLAYPADDINGTOP, graphCurs, SCREEN_HEIGHT, SSD1306_WHITE);
+  }
+
   forceMenuRedraw = false;
   display.display();
 }
+void graphCursorMove(const int8_t dir) {
+  if ((int8_t)graphCurs + dir < 0)
+    graphCurs = MEASDATALENGTH - 1;
+  else if ((int8_t)graphCurs + dir >= MEASDATALENGTH)
+    graphCurs = 0;
+  else graphCurs += dir;
+}
+
+
+
 void displaySettings() {
   if (isDimmed) return;
 
