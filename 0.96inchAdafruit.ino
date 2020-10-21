@@ -151,15 +151,21 @@ void loop() {
   if (btnR.isSingle()) {
     // Serial.println(F("btnR"));
     if (!displayWakeUp()) {
-      if (menuScreen == 2) {
-      // if in process of changing settings
+      // if graph screen
+      if (menuScreen == 1) {
+        changeMenuScreen(1);
+      }
+      // if settings screen
+      else if (menuScreen == 2) {
+        // if in process of changing settings
         if (settingIsChanging) {
           incrementSettingSelected(1);
-        } else {
+        }
+        // if not changing settings
+        else {
           changeMenuScreen(1);
         }
       }
-      // if not changing settings
       else {
         changeMenuScreen(1);
       }
@@ -168,8 +174,12 @@ void loop() {
   }
   if (btnL.isHolded()) {
     // Serial.println(F("isHolded()"));
+    // if graph screen
+    if (menuScreen == 1) {
+
+    }
     // if settings screen
-    if (menuScreen == 2) {
+    else if (menuScreen == 2) {
       settingsHoldAction();
       forceMenuRedraw = true;
       timeoutSaveLastMenu.start();
@@ -318,6 +328,18 @@ void settingsHoldAction() {
     // Serial.println(F("hb"));
     curs = 0;
     cycled = false;
+    measChanged = true;
+    measMin = INT32_MAX;
+    measMax = INT32_MIN;
+    measMinG = INT32_MAX;
+    measMaxG = INT32_MIN;
+    measMin8 = INT8_MAX;
+    measMinInd = 0;
+    measMaxInd = 0;
+    scale = 2.f;
+    measurePartial();
+    setStoreTempTimer();
+
     settingIsChanging = true;
     forceMenuRedraw = true;
   }
