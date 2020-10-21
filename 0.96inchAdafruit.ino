@@ -1,4 +1,10 @@
-// TODO: timerGraph waits for the interval without drawing anything!
+#include <Adafruit_SSD1306.h>
+#include <GyverButton.h>
+#include <GyverTimer.h>
+#include <EEPROM.h>
+
+#include "thermistorMinim.h"
+
 
 // Settings constants
 #define TEMPSHOWINTERVAL 500
@@ -34,12 +40,9 @@
 #define GRAPHPADDINGTOP 2
 #define GRAPHPADDINGBOT 2
 
-#include <Adafruit_SSD1306.h>
-#include <GyverButton.h>
-#include <GyverTimer.h>
-#include <EEPROM.h>
+#define EEPROMSAVEMENUTIMEOUT 5000
 
-#include "thermistorMinim.h"
+#define PGM_READ_CHARARR(val) (char*)pgm_read_word(&val)
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
@@ -52,6 +55,7 @@ GTimer timerGetTemp;
 GTimer timerShowTemp;
 GTimer timerStoreTemp;
 GTimer timerDisplayDim;
+GTimer timeoutSaveLastMenu;
 
 char tempStrBuf[6];
 bool isDimmed = false;
@@ -81,24 +85,18 @@ bool forceMenuRedraw = true;  // can be set to force display methods to redraw. 
 byte settingSelected = 0;
 byte settingIsChanging = false;
 // https://www.arduino.cc/reference/en/language/variables/utilities/progmem/
+const char* const PROGMEM settingsNames[] = {"       Dimming:", " Graph timeout:"};
+#define SETTINGSNAMESSIZE 2
 const char* const PROGMEM settingsOptsDimming[] = {"off ", " 5s ", "10s ", "15s ", "30s ", "60s "};
-#define SETTINGSOPTSDIMMINGSIZE 6
+#define SETTINGSOPTSDIMMINGSIZE 6  // no more than 8!
 byte settingsOptsDimmingCur = 3;
 const char* const PROGMEM settingsOptsGraph[] = {".25s", ".5s ", " 1s ", " 2s ", " 5s ", "10s ", "15s ", "30s ", " 1m ", " 2m ", " 5m ", "10m ", "15m "};
-#define SETTINGSOPTSGRAPHSIZE 13
+#define SETTINGSOPTSGRAPHSIZE 13  // no more than 16!
 byte settingsOptsGraphCur = 1;
 
-// EEPROM management variables
-// x - not used, b - bit value
-// [0..1015]    -> data
-// [1022..1023] -> cursor value (12 bits: [xxxxbbbbbbbbbbbb])
-// [1021]       -> resolution (8 bits: [bbbbbbbb])
-// [1020]       -> range (8 bits)
-// [1019]       -> min (8 bits)
-//unsigned int eepromCursor = 0;
 
 void setup() {
-  Serial.begin(57600);
+  // Serial.begin(57600);
 
   // Serial.print("displayDimTimeout: ");
   // Serial.println(displayDimTimeout);
@@ -156,12 +154,12 @@ void loop() {
         if (settingIsChanging) {
           incrementSettingSelected(1);
         } else {
-          menuScreen = (menuScreen + 1) % 3;
+          changeMenuScreen(1);
         }
       }
       // if not changing settings
       else {
-        menuScreen = (menuScreen + 1) % 3;
+        changeMenuScreen(1);
       }
       forceMenuRedraw = true;
     }
@@ -184,8 +182,14 @@ void loop() {
     displaySettings();
   }
 
+  // timer for dimming screen
   if (timerDisplayDim.isReady() && !isDimmed) {
     dim(true);
+  }
+
+  // timeout for saving last menu screen to EEPROM
+  if (timeoutSaveLastMenu.isReady()){
+    saveParams2EEPROM();
   }
 }
 
@@ -212,12 +216,15 @@ void initParamsFromEEPROM() {
   uint16_t params;
   EEPROM.get(EEPROM.length() - 2, params);
   // 3 bits for dim, 4 bits for graph, 2 bits for last_menu
+  // 15 14 13   12 11 10 9   8 7   6 5 4 3 2 1 0   <- bits
+  //   dim         graph     menu                  <- vars
   settingsOptsDimmingCur = params >> 13;
   settingsOptsGraphCur = (params >> 9) & 15;
+  menuScreen = (params >> 7) & 3;
 }
 void saveParams2EEPROM() {
-  // 3 bits for dim, 4 bits for graph
-  uint16_t params = ((settingsOptsDimmingCur << 4) | settingsOptsGraphCur) << 9;
+  // 3 bits for dim, 4 bits for graph, 2 bits for last_menu
+  uint16_t params = ((((settingsOptsDimmingCur << 4) | settingsOptsGraphCur) << 2) | menuScreen) << 7;
   EEPROM.put(EEPROM.length() - 2, params);
 }
 void initButtons() {
@@ -239,8 +246,14 @@ void initTimers() {
   #ifndef DISPLAYDIMENABLED
     setDisplayDimTimer();
   #endif
+  timeoutSaveLastMenu.setTimeout(EEPROMSAVEMENUTIMEOUT);
+  timeoutSaveLastMenu.stop();
 }
 
+void changeMenuScreen(int8_t dir) {
+  menuScreen = (menuScreen + 1) % 3;
+  timeoutSaveLastMenu.start();
+}
 // either wakes arduino up and resets dimTimeout, or just resets timeout.
 // returns true, if woke up, false, if only timeout has been reset
 bool displayWakeUp() {
@@ -253,7 +266,7 @@ bool displayWakeUp() {
   }
 }
 // either turns dim on or off
-void dim(bool v) {
+void dim(const bool &v) {
   if (!timerDisplayDim.isEnabled()) return;
   if (!v) {
     // Serial.println(F("cl"));
@@ -271,7 +284,7 @@ void updateDimTimer() {
   timerDisplayDim.start();
 }
 
-void incrementSettingSelected(int8_t dir) {
+void incrementSettingSelected(const int8_t &dir) {
     if (settingSelected == 0)
       settingsOptsDimmingCur = (settingsOptsDimmingCur + dir) < 0 ? (SETTINGSOPTSDIMMINGSIZE-1) : ((settingsOptsDimmingCur + dir) % SETTINGSOPTSDIMMINGSIZE);
     else if (settingSelected == 1)
@@ -412,24 +425,25 @@ void displaySettings() {
     display.setTextSize(1);
 
     // dimming timeout
-    display.setCursor(0, DISPLAYPADDINGTOP+1);
-    if (!settingIsChanging && settingSelected == 0) {
-      display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-      display.drawRect(display.getCursorX(),display.getCursorY()-1, 15*5, 10, SSD1306_WHITE);
-    }
-    else {
-      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-    }
-    display.print(F("       Dimming:"));
-    display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-    display.print(" ");
-    if (settingIsChanging && settingSelected == 0) {
-      display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-      display.drawRect(display.getCursorX(),display.getCursorY()-1, 4*5, 10, SSD1306_WHITE);
-    } else {
-      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-    }
-    display.print((char*)pgm_read_word(&(settingsOptsDimming[settingsOptsDimmingCur])));
+    displaySettingsEntry(DISPLAYPADDINGTOP+1, PGM_READ_CHARARR(settingsNames[0]), PGM_READ_CHARARR(settingsOptsDimming[settingsOptsDimmingCur]));
+    // display.setCursor(0, DISPLAYPADDINGTOP+1);
+    // if (!settingIsChanging && settingSelected == 0) {
+    //   display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+    //   display.drawRect(display.getCursorX(),display.getCursorY()-1, 15*5, 10, SSD1306_WHITE);
+    // }
+    // else {
+    //   display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    // }
+    // display.print(F("       Dimming:"));
+    // display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    // display.print(" ");
+    // if (settingIsChanging && settingSelected == 0) {
+    //   display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+    //   display.drawRect(display.getCursorX(),display.getCursorY()-1, 4*5, 10, SSD1306_WHITE);
+    // } else {
+    //   display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    // }
+    // display.print((char*)pgm_read_word(&(settingsOptsDimming[settingsOptsDimmingCur])));
     
     display.setCursor(0, (DISPLAYPADDINGTOP+1) + 12);
     display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
@@ -451,6 +465,26 @@ void displaySettings() {
     display.display();
   }
   forceMenuRedraw = false;
+}
+void displaySettingsEntry(byte rowY, char* name, char* val) {
+    display.setCursor(0, rowY);
+    if (!settingIsChanging && settingSelected == 0) {
+      display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+      display.drawRect(display.getCursorX(), display.getCursorY()-1, 15*5, 10, SSD1306_WHITE);
+    }
+    else {
+      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    }
+    display.print(name);
+    display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    display.print(" ");
+    if (settingIsChanging && settingSelected == 0) {
+      display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+      display.drawRect(display.getCursorX(), display.getCursorY()-1, 4*5, 10, SSD1306_WHITE);
+    } else {
+      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    }
+    display.print(val);
 }
 
 void measurePartial() {
@@ -534,7 +568,7 @@ void storeMeasurement() {
   }
   if (recalcMin || recalcMax || recalcRange) {
     measMin8 = measMin;
-    int8_t range = (int8_t)measMax - measMin8;
+    int8_t range = (int8_t)measMax - measMin8;  // calculate in bytes for scale to correspond correctly to screen height
     if (range >= 1) scale = (float)(DISPLAYDATAHEIGHT - 1 - (GRAPHPADDINGTOP + GRAPHPADDINGBOT)) / range;  // use this for aligning graph vertically to the center
     else scale = 2.f;
     
