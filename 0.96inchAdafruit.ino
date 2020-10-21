@@ -28,9 +28,9 @@
 #define BTNRIGHT_PIN 2
 #define OLED_RESET -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 #define BTNDEBOUNCE 40
-#define BTNCLICKTIMEOUT 200  // timeout between consequent clicks
+#define BTNCLICKTIMEOUT 150  // timeout between consequent clicks
 #define BTNHOLDTIMEOUT 400  // timeout for holding a button
-#define BTNSTEPTIMEOUT 100  // timout between steps while holding button
+#define BTNSTEPTIMEOUT 80  // timout between steps while holding button
 
 #define GRAPHBTNSTEPS4SPEED 15  // steps after which speed is increased by 2
 
@@ -508,26 +508,26 @@ void displayGraph() {
 
   /* === draw caption === */
   if (timerShowTemp.isReady() || forceMenuRedraw) {
-    display.fillRect(0, 0, SCREEN_WIDTH, DISPLAYPADDINGTOP, SSD1306_BLACK);
+    // only draw this caption if graphCursor mode is inactive
+    if (graphCurs >= MEASDATALENGTH) {
+      display.fillRect(0, 0, SCREEN_WIDTH, DISPLAYPADDINGTOP, SSD1306_BLACK);
 
-    display.setCursor(0, 0);
-    display.setTextColor(SSD1306_WHITE);  // Draw white text
-    display.setTextSize(1);
+      display.setCursor(0, 0);
+      display.setTextColor(SSD1306_WHITE);  // Draw white text
+      display.setTextSize(1);
 
-    dtostrf(therm.computeTemp(tempValPartAverage), 6, 2, tempStrBuf);
-    display.print(tempStrBuf);
-    // do not show min/max until first storage iteration updates its default values
-    if (cycled || curs > 0) {
-      display.print(" ");
-      byte curX = display.getCursorX();
-      display.print("l:");
-      dtostrf(measMin, 5, 1, tempStrBuf);
+      dtostrf(therm.computeTemp(tempValPartAverage), 6, 2, tempStrBuf);
       display.print(tempStrBuf);
-      display.print(" ");
-      dtostrf(measMax, 5, 1, tempStrBuf);
-      display.print(tempStrBuf);
-      // only draw globals if graphCursor mode is inactive
-      if (graphCurs >= MEASDATALENGTH) {
+      // do not show min/max until first storage iteration updates its default values
+      if (cycled || curs > 0) {
+        display.print(" ");
+        byte curX = display.getCursorX();
+        display.print("l:");
+        dtostrf(measMin, 5, 1, tempStrBuf);
+        display.print(tempStrBuf);
+        display.print(" ");
+        dtostrf(measMax, 5, 1, tempStrBuf);
+        display.print(tempStrBuf);
         display.setCursor(curX, 8);
         display.print("g:");
         dtostrf(measMinG, 5, 1, tempStrBuf);
@@ -563,6 +563,20 @@ void displayGraph() {
   /* === draw cursor === */
   if (graphCurs < MEASDATALENGTH) {
     display.drawLine(graphCurs, DISPLAYPADDINGTOP, graphCurs, SCREEN_HEIGHT, SSD1306_WHITE);
+    
+    display.fillRect(0, 0, SCREEN_WIDTH, DISPLAYPADDINGTOP, SSD1306_BLACK);
+
+    display.setCursor(0, 0);
+    display.setTextColor(SSD1306_WHITE);  // Draw white text
+    display.setTextSize(1);
+
+    formatBackTime((MEASDATALENGTH - graphCurs) * timerStoreTemp.getInterval(), tempStrBuf, 1);
+    display.print('-');
+    display.print(tempStrBuf[1]);
+    display.print(tempStrBuf[2]);
+    display.print(tempStrBuf[3]);
+    display.print(tempStrBuf[4]);
+    display.print(' ');
   }
 
   forceMenuRedraw = false;
@@ -712,5 +726,63 @@ void storeMeasurement() {
     
     // Serial.print("; scale: ");
     // Serial.println(scale);
+  }
+}
+
+void formatBackTime(uint32_t ms, char* tempStrBuf, byte startInd) {
+  uint32_t t;
+  if (ms < 10000) {  // < 10s
+      tempStrBuf[startInd+0] = ms / 1000 + 48;
+      tempStrBuf[startInd+1] = '.';
+      tempStrBuf[startInd+2] = ms % 1000 / 100 + 48;
+      tempStrBuf[startInd+3] = 's';
+  } else if (ms < 60000) {  // < 60s == 1m
+      t = ms / 1000;  // seconds
+      tempStrBuf[startInd+0] = t / 10 + 48;
+      tempStrBuf[startInd+1] = t % 10 + 48;
+      tempStrBuf[startInd+2] = ' ';
+      tempStrBuf[startInd+3] = 's';
+  } else if (ms < 600000) {  // < 600s == 10m
+      t = ms / 1000;  // seconds
+      tempStrBuf[startInd+0] = t / 60 + 48;
+      tempStrBuf[startInd+1] = '.';
+      tempStrBuf[startInd+2] = t % 60 / 6 + 48;
+      tempStrBuf[startInd+3] = 'm';
+  } else if (ms < 3600000) {  // < 60m == 1h
+      t = ms / 60000;  // minutes
+      tempStrBuf[startInd+0] = ' ';
+      tempStrBuf[startInd+1] = t / 10 + 48;
+      tempStrBuf[startInd+2] = t % 10 + 48;
+      tempStrBuf[startInd+3] = 'm';
+  } else if (ms < 36000000) {  // < 600m == 10h
+      t = ms / 60000;  // minutes
+      tempStrBuf[startInd+0] = t / 60 + 48;
+      tempStrBuf[startInd+1] = '.';
+      tempStrBuf[startInd+2] = t % 60 / 6 + 48;
+      tempStrBuf[startInd+3] = 'h';
+  } else if (ms < 86400000) {  // < 24h == 1d
+      t = ms / 3600000;  // hours
+      tempStrBuf[startInd+0] = ' ';
+      tempStrBuf[startInd+1] = t / 10 + 48;
+      tempStrBuf[startInd+2] = t % 10 + 48;
+      tempStrBuf[startInd+3] = 'h';
+  } else if (ms < 864000000) {  // < 240h == 10d
+      t = ms / 3600000;  // hours
+      tempStrBuf[startInd+0] = t / 24 + 48;
+      tempStrBuf[startInd+1] = '.';
+      tempStrBuf[startInd+2] = t % 24 * 10 / 24 + 48;
+      tempStrBuf[startInd+3] = 'd';
+  } else if (ms < 2592000000) {  // < 30d == 1M
+      t = ms / 86400000;  // days
+      tempStrBuf[startInd+0] = ' ';
+      tempStrBuf[startInd+1] = t / 10 + 48;
+      tempStrBuf[startInd+2] = t % 10 + 48;
+      tempStrBuf[startInd+3] = 'd';
+  } else {  // > 1M
+      t = ms / 86400000;  // days
+      tempStrBuf[startInd+0] = t / 30 + 48;
+      tempStrBuf[startInd+1] = '.';
+      tempStrBuf[startInd+2] = t % 30 / 3 + 48;
+      tempStrBuf[startInd+3] = 'M';
   }
 }
