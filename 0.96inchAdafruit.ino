@@ -94,7 +94,7 @@ const byte settingsIsChangable = 0b11000000;  // older bit goes first
 const char* const PROGMEM settingsOptsDimming[] = {"off ", " 5s ", "10s ", "15s ", "30s ", "60s "};
 #define SETTINGSOPTSDIMMINGSIZE 6  // no more than 8!
 byte settingsOptsDimmingCur = 3;
-const char* const PROGMEM settingsOptsGraph[] = {".25s", ".5s ", " 1s ", " 2s ", " 5s ", "10s ", "15s ", "30s ", " 1m ", " 2m ", " 5m ", "10m ", "15m "};
+const char* const PROGMEM settingsOptsGraph[] = {".25s", ".5s ", " 1s ", " 2s ", " 5s ", "10s ", "15s ", "30s ", " 1m ", " 2m ", " 5m ", "10m ", "15m ", "30m ", " 1h "};
 #define SETTINGSOPTSGRAPHSIZE 13  // no more than 16!
 byte settingsOptsGraphCur = 1;
 
@@ -135,8 +135,7 @@ void loop() {
     storeMeasurement();    
   }
 
-  if (btnL.isSingle()) {
-    // Serial.println(F("btnL"));
+  if (btnL.isPress()) {
     // if button has been pushed while active (not sleeping)
     if (!displayWakeUp()) {
       // if graph screen
@@ -144,52 +143,65 @@ void loop() {
         // graphCursor mode active
         if (graphCurs < MEASDATALENGTH) {
           graphCursorMove(-1);
+          forceMenuRedraw = true;
         } else {}
       }
-      // if settings screen
-      else if (menuScreen == 2) {
-          // if in process of changing settings
-          if (settingIsChanging) {
-            incrementSettingSelected(-1);
-          }
-          // if not changing settings atm
-          else {
-            // Serial.println("btnL -> not changing");
-            settingSelected = (settingSelected + 1) % SETTINGSNAMESSIZE;
-            // timeoutSaveLastMenu.start(); // probably not needed
-          }
-      }
-      forceMenuRedraw = true;
     }
   }
-  if (btnR.isSingle()) {
-    // Serial.println(F("btnR"));
+  if (btnR.isPress()) {
+    // if button has been pushed while active (not sleeping)
     if (!displayWakeUp()) {
-      // if graph screen
       if (menuScreen == 1) {
         // graphCursor mode active
         if (graphCurs < MEASDATALENGTH) {
           graphCursorMove(1);
-        } else {
-          changeMenuScreen(1);
+          forceMenuRedraw = true;
         }
       }
-      // if settings screen
-      else if (menuScreen == 2) {
+    }
+  }
+
+  if (btnL.isSingle()) {
+    // no need for displayWakeUp, since it is already done in isPress() check
+    if (menuScreen == 1) {}
+    // if settings screen
+    else if (menuScreen == 2) {
         // if in process of changing settings
         if (settingIsChanging) {
-          incrementSettingSelected(1);
+          incrementSettingSelected(-1);
         }
-        // if not changing settings
+        // if not changing settings atm
         else {
-          changeMenuScreen(1);
+          // Serial.println("btnL -> not changing");
+          settingSelected = (settingSelected + 1) % SETTINGSNAMESSIZE;
+          // timeoutSaveLastMenu.start(); // probably not needed
         }
+    }
+    forceMenuRedraw = true;
+  }
+  if (btnR.isSingle()) {
+    // if graph screen
+    if (menuScreen == 1) {
+      // graphCursor mode active
+      if (graphCurs >= MEASDATALENGTH) {
+        changeMenuScreen(1);
       }
+    }
+    // if settings screen
+    else if (menuScreen == 2) {
+      // if in process of changing settings
+      if (settingIsChanging) {
+        incrementSettingSelected(1);
+      }
+      // if not changing settings
       else {
         changeMenuScreen(1);
       }
-      forceMenuRedraw = true;
     }
+    else {
+      changeMenuScreen(1);
+    }
+    forceMenuRedraw = true;
   }
   // triggers once after BTNHOLDTIMEOUT has passed
   if (btnL.isHolded()) {
@@ -448,24 +460,30 @@ void settingsHoldAction() {
 
 // takes index of dimming option and sets timer with according interval
 void setDisplayDimTimer() {
-    if (settingsOptsDimmingCur == 1) timerDisplayDim.setInterval(5000);
-    else if (settingsOptsDimmingCur == 2) timerDisplayDim.setInterval(10000);
-    else if (settingsOptsDimmingCur == 3) timerDisplayDim.setInterval(15000);
-    else if (settingsOptsDimmingCur == 4) timerDisplayDim.setInterval(30000);
-    else if (settingsOptsDimmingCur == 5) timerDisplayDim.setInterval(60000);
-    else timerDisplayDim.stop();
+  if (settingsOptsDimmingCur == 1) timerDisplayDim.setInterval(5000);
+  else if (settingsOptsDimmingCur == 2) timerDisplayDim.setInterval(10000);
+  else if (settingsOptsDimmingCur == 3) timerDisplayDim.setInterval(15000);
+  else if (settingsOptsDimmingCur == 4) timerDisplayDim.setInterval(30000);
+  else if (settingsOptsDimmingCur == 5) timerDisplayDim.setInterval(60000);
+  else timerDisplayDim.stop();
 }
 void setStoreTempTimer() {
-    if (settingsOptsGraphCur == 1) timerStoreTemp.setInterval(500);
-    else if (settingsOptsGraphCur == 2) timerStoreTemp.setInterval(1000);
-    else if (settingsOptsGraphCur == 3) timerStoreTemp.setInterval(5000);
-    else if (settingsOptsGraphCur == 4) timerStoreTemp.setInterval(15000);
-    else if (settingsOptsGraphCur == 5) timerStoreTemp.setInterval(30000);
-    else if (settingsOptsGraphCur == 6) timerStoreTemp.setInterval(60000);
-    else if (settingsOptsGraphCur == 7) timerStoreTemp.setInterval(120000);
-    else if (settingsOptsGraphCur == 8) timerStoreTemp.setInterval(600000);
-    else timerStoreTemp.setInterval(250);
-    timerStoreTemp.setReadyOnStart(true);
+  if (settingsOptsGraphCur == 1) timerStoreTemp.setInterval(500);
+  else if (settingsOptsGraphCur == 2) timerStoreTemp.setInterval(1000);
+  else if (settingsOptsGraphCur == 3) timerStoreTemp.setInterval(2000);
+  else if (settingsOptsGraphCur == 4) timerStoreTemp.setInterval(5000);
+  else if (settingsOptsGraphCur == 5) timerStoreTemp.setInterval(10000);
+  else if (settingsOptsGraphCur == 6) timerStoreTemp.setInterval(15000);
+  else if (settingsOptsGraphCur == 7) timerStoreTemp.setInterval(30000);
+  else if (settingsOptsGraphCur == 8) timerStoreTemp.setInterval(60000);
+  else if (settingsOptsGraphCur == 9) timerStoreTemp.setInterval(120000);
+  else if (settingsOptsGraphCur == 10) timerStoreTemp.setInterval(30000);
+  else if (settingsOptsGraphCur == 11) timerStoreTemp.setInterval(600000);
+  else if (settingsOptsGraphCur == 12) timerStoreTemp.setInterval(900000);
+  else if (settingsOptsGraphCur == 13) timerStoreTemp.setInterval(1800000);
+  else if (settingsOptsGraphCur == 14) timerStoreTemp.setInterval(3600000);
+  else timerStoreTemp.setInterval(250);
+  timerStoreTemp.setReadyOnStart(true);
 }
 
 
@@ -570,13 +588,21 @@ void displayGraph() {
     display.setTextColor(SSD1306_WHITE);  // Draw white text
     display.setTextSize(1);
 
-    formatBackTime((MEASDATALENGTH - graphCurs) * timerStoreTemp.getInterval(), tempStrBuf, 1);
-    display.print('-');
-    display.print(tempStrBuf[1]);
-    display.print(tempStrBuf[2]);
-    display.print(tempStrBuf[3]);
-    display.print(tempStrBuf[4]);
-    display.print(' ');
+    // draw current X position as -time
+    // TODO: graphCurs == curs  =>  shows 0.00 degrees!
+    int8_t curBackTime = (cycled ? (MEASDATALENGTH - 1) : curs) - graphCurs;
+    if (curBackTime >= 0) {
+      formatBackTime(curBackTime * timerStoreTemp.getInterval(), tempStrBuf, 1);
+      display.print('-');
+      display.print(tempStrBuf[1]);
+      display.print(tempStrBuf[2]);
+      display.print(tempStrBuf[3]);
+      display.print(tempStrBuf[4]);
+      
+      display.setCursor(display.getCursorX() + 8, 0);
+      dtostrf(measData[graphCurs], 6, 2, tempStrBuf);
+      display.print(tempStrBuf);
+    }
   }
 
   forceMenuRedraw = false;
