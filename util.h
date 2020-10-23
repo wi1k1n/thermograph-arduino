@@ -7,7 +7,7 @@ float computeTemp(const float &analogValue) {
   // Wiring:
   // GND --- thermistor --- A0 --- 10k --- 5V
   float logR2 = log(R1 * (1023.f / analogValue - 1.f));
-  return (1.f / (C1 + C2*logR2 + C3*logR2*logR2*logR2)) - 273.15f;
+  return (((1.f / (C1 + C2*logR2 + C3*logR2*logR2*logR2)) - 273.15f));
 }
 
 // takes time in MS and writes 4 chars to buffer (starting from startInd) of formatted time

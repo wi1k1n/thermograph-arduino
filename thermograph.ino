@@ -26,7 +26,6 @@ bool isDimmed = false;
 // temperature variables
 float tempValPartAverage;  // partially averaged value of analogRead(thermistor)
 byte tempValN = 0;  // number of currently got measurements
-float temp;  // degrees of Celsium
 
 // measurements and display graph variables
 int8_t measData[MEASDATALENGTH];
@@ -48,8 +47,8 @@ bool forceMenuRedraw = true;  // can be set to force display methods to redraw. 
 byte settingSelected = 0;
 byte settingIsChanging = false;
 // https://www.arduino.cc/reference/en/language/variables/utilities/progmem/
-const char* const PROGMEM settingsNames[] = {"       Dimming:", " Graph timeout:", "Clear data"};
-#define SETTINGSNAMESSIZE 3
+const char* const PROGMEM settingsNames[] = {"       Dimming:", " Graph timeout:", "Reset", "Save", "Load", "USB"};
+#define SETTINGSNAMESSIZE 6
 const byte settingsIsChangable = 0b11000000;  // older bit goes first
 const char* const PROGMEM settingsOptsDimming[] = {"off ", " 5s ", "10s ", "15s ", "30s ", "60s "};
 #define SETTINGSOPTSDIMMINGSIZE 6  // no more than 8!
@@ -364,7 +363,7 @@ bool displayWakeUp() {
   }
 }
 // either turns dim on or off
-void dim(const bool &v) {
+void dim(const bool v) {
   if (!timerDisplayDim.isEnabled()) return;
   if (!v) {
     // Serial.println(F("cl"));
@@ -592,20 +591,20 @@ void displaySettings() {
     display.clearDisplay();
     display.setTextSize(1);
 
-    // settings with options
+    // dimming & graph timeout
     displaySettingsEntry(0, PGM_READ_CHARARR(settingsNames[0]), PGM_READ_CHARARR(settingsOptsDimming[settingsOptsDimmingCur]));
     displaySettingsEntry(1, PGM_READ_CHARARR(settingsNames[1]), PGM_READ_CHARARR(settingsOptsGraph[settingsOptsGraphCur]));
 
-    // settings as buttons
-    display.setCursor(2, (DISPLAYPADDINGTOP+2) + 12*2 + 2);  // default_padding + 12*row + extra_padding
-    if (settingSelected == 2 && !settingIsChanging) {  // == row
-      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-    } else {
-      display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-      display.drawRect(1, display.getCursorY()-1, 10*6+2, 10, SSD1306_WHITE);
-    }
-    display.print(settingsNames[2]);
-    display.drawRect(0, display.getCursorY()-2, 10*6+4, 12, SSD1306_WHITE);
+    // save, load, usb button
+    const byte PROGMEM SLULEFTPADDING = 6;  // SaveLoadUsbLeftPadding
+    const byte PROGMEM SLUY = (DISPLAYPADDINGTOP+2) + 12*2;
+    
+    // clear data
+    displaySettingsButton(2, SLULEFTPADDING, SLUY, 5, PGM_READ_CHARARR(settingsNames[2]));
+    displaySettingsButton(3, display.getCursorX() + 3, SLUY, 4, PGM_READ_CHARARR(settingsNames[3]));
+    displaySettingsButton(4, display.getCursorX() + 3, SLUY, 4, PGM_READ_CHARARR(settingsNames[4]));
+    displaySettingsButton(5, display.getCursorX() + 3, SLUY, 3, PGM_READ_CHARARR(settingsNames[5]));
+
 
     // settings description
     // graph timeout setting
@@ -629,7 +628,7 @@ void displaySettings() {
   forceMenuRedraw = false;
 }
 // draws each entry in settings
-void displaySettingsEntry(byte row, char* name, char* val) {
+void displaySettingsEntry(const byte row, const char* name, const char* val) {
     display.setCursor(0, (DISPLAYPADDINGTOP+2) + 12*row);
     display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
     display.print(name);
@@ -648,6 +647,18 @@ void displaySettingsEntry(byte row, char* name, char* val) {
       display.drawRect(0, display.getCursorY()-2, SCREEN_WIDTH, 12, SSD1306_WHITE);
     }
 }
+// draws button in settings
+void displaySettingsButton(const byte ind, const byte x, const byte y, const byte l, const char* val) {
+    display.setCursor(x + 2, y + 2);
+    if (settingSelected == ind && !settingIsChanging) {  // == row
+      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    } else {
+      display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+      display.drawRect(display.getCursorX()-1, display.getCursorY()-1, l*6+2, 10, SSD1306_WHITE);
+    }
+    display.drawRect(display.getCursorX()-2, display.getCursorY()-2, l*6+4, 12, SSD1306_WHITE);
+    display.print(val);
+}
 
 void measurePartial() {
   tempValPartAverage = (tempValPartAverage * tempValN + analogRead(THERMISTORPIN)) / (tempValN + 1);
@@ -656,7 +667,7 @@ void measurePartial() {
 
 void storeMeasurement() {
   // calculate temp out of partial average
-  temp = computeTemp(tempValPartAverage);
+  float temp = computeTemp(tempValPartAverage);
   
   // reset partial average variables
   tempValPartAverage = 0;

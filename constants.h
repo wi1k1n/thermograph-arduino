@@ -1,5 +1,6 @@
 // Main constants
 #define TEMPAVERAGEN 20  // [0..255] - number of intermediate measurements
+// #define PSEUDOFLOATPRECISION 10
 #define MEASDATALENGTH 128  // bigger than SCREEN_WIDTH is not supported yet
 
 //#define EEPROMMEASBITS 5  // [1..8] - how many bits to use for each measurement when storing in EEPROM
