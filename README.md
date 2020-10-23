@@ -12,3 +12,8 @@ Build a arduino-based thermometer.
 ## Wiring
 
 (Coming soon)
+
+## Known bugs
+
+- Time estimations r not accurate (should be rounded instead of flooring)
+- 0 degrees at -0 seconds

@@ -12,9 +12,6 @@
 #define TEMPAVERAGEN 20  // [0..255] - number of intermediate measurements
 #define MEASDATALENGTH 128  // bigger than SCREEN_WIDTH is not supported yet
 
-// #define DISPLAYDIMENABLED  // uncomment this to enable
-
-
 //#define EEPROMMEASBITS 5  // [1..8] - how many bits to use for each measurement when storing in EEPROM
 //#define EEPROMMEASRANGE 32  // [2^EEPROMMEASBITS .. 256] - what range of temperatures (in degrees of celsium) each measurement covers
 //#define EEPROMMEASMIN 0  // [-128 .. 127-EEPROMMEASRANGE] - minimum measured temperature
@@ -95,7 +92,9 @@ const char* const PROGMEM settingsOptsDimming[] = {"off ", " 5s ", "10s ", "15s 
 #define SETTINGSOPTSDIMMINGSIZE 6  // no more than 8!
 byte settingsOptsDimmingCur = 3;
 const char* const PROGMEM settingsOptsGraph[] = {".25s", ".5s ", " 1s ", " 2s ", " 5s ", "10s ", "15s ", "30s ", " 1m ", " 2m ", " 5m ", "10m ", "15m ", "30m ", " 1h "};
-#define SETTINGSOPTSGRAPHSIZE 13  // no more than 16!
+const uint16_t PROGMEM settingsOptsGraphVals[] = {250, 500, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600};
+const uint16_t PROGMEM settingsOptsGraphValsMSMask = 0b1100000000000001;
+#define SETTINGSOPTSGRAPHSIZE 15  // no more than 16!
 byte settingsOptsGraphCur = 1;
 
 // graphCurs > MEASDATALENGTH  ==>  graphCurs is not active
@@ -105,6 +104,13 @@ byte graphCursSteps = 0;
 
 void setup() {
   // Serial.begin(57600);
+
+  // Serial.println(pgm_read_word(&settingsOptsGraphValsMSMask));
+  // for (byte i = 0; i < SETTINGSOPTSGRAPHSIZE; i++) {
+  //   Serial.print(PGM_READ_CHARARR(settingsOptsGraph[i]));
+  //   Serial.print(": ");
+  //   Serial.println(getStoreTempTimerInterval(i));
+  // }
 
   // Serial.print("displayDimTimeout: ");
   // Serial.println(displayDimTimeout);
@@ -142,8 +148,10 @@ void loop() {
       if (menuScreen == 1) {
         // graphCursor mode active
         if (graphCurs < MEASDATALENGTH) {
-          graphCursorMove(-1);
-          forceMenuRedraw = true;
+          if (!btnR.isHold()) {
+            graphCursorMove(-1);
+            forceMenuRedraw = true;
+          }
         } else {}
       }
     }
@@ -154,8 +162,10 @@ void loop() {
       if (menuScreen == 1) {
         // graphCursor mode active
         if (graphCurs < MEASDATALENGTH) {
-          graphCursorMove(1);
-          forceMenuRedraw = true;
+          if (!btnL.isHold()) {
+            graphCursorMove(1);
+            forceMenuRedraw = true;
+          }
         }
       }
     }
@@ -212,7 +222,7 @@ void loop() {
         graphCursSteps = 0;
         // if graphCursor mode not active
         if (graphCurs >= MEASDATALENGTH) {
-          graphCurs = 0;
+          graphCurs = curs;
           btnL.resetStates();
         }
       }
@@ -323,6 +333,7 @@ void initDisplay() {
     }
   }
 
+  // display.setRotation(2);
   display.cp437(true);  // Use full 256 char 'Code Page 437' font
   
   display.display();  // display is initialized with Adafruit splash screen
@@ -363,12 +374,17 @@ void initSensors() {
   measurePartial();
 }
 void initTimers() {
+  // when live temp is updated (on both live and graph screens)
   timerShowTemp.setInterval(TEMPSHOWINTERVAL);
+
+  // when graph is updated
   setStoreTempTimer();
+  timerStoreTemp.setReadyOnStart(true);
+
+  // intermediate (between each store iterations) measurements (regulated by TEMPAVERAGEN const)
   timerGetTemp.setInterval((min(TEMPSHOWINTERVAL, timerStoreTemp.getInterval()) - 1) / TEMPAVERAGEN);
-  #ifndef DISPLAYDIMENABLED
-    setDisplayDimTimer();
-  #endif
+
+  // when last visited screen should be stored in EEPROM
   timeoutSaveLastMenu.setTimeout(EEPROMSAVEMENUTIMEOUT);
   timeoutSaveLastMenu.stop();
 }
@@ -407,12 +423,14 @@ void updateDimTimer() {
   timerDisplayDim.start();
 }
 
+// changing value of changing setting
 void incrementSettingSelected(const int8_t &dir) {
     if (settingSelected == 0)
       settingsOptsDimmingCur = (settingsOptsDimmingCur + dir) < 0 ? (SETTINGSOPTSDIMMINGSIZE-1) : ((settingsOptsDimmingCur + dir) % SETTINGSOPTSDIMMINGSIZE);
     else if (settingSelected == 1)
       settingsOptsGraphCur = (settingsOptsGraphCur + dir) < 0 ? (SETTINGSOPTSGRAPHSIZE-1) : ((settingsOptsGraphCur + dir) % SETTINGSOPTSGRAPHSIZE);
 }
+
 // is called when holded action button on settings menu
 void settingsHoldAction() {
   // if button selected (currently only button at index 2)
@@ -467,23 +485,14 @@ void setDisplayDimTimer() {
   else if (settingsOptsDimmingCur == 5) timerDisplayDim.setInterval(60000);
   else timerDisplayDim.stop();
 }
+// returns corresponding to ind value of store timer (in ms)
+uint32_t getStoreTempTimerInterval(byte ind) {
+  if (bitRead(pgm_read_word(&settingsOptsGraphValsMSMask), 15-ind))
+    return pgm_read_word(&settingsOptsGraphVals[ind]);
+  else return (uint32_t)pgm_read_word(&settingsOptsGraphVals[ind]) * 1000;
+}
 void setStoreTempTimer() {
-  if (settingsOptsGraphCur == 1) timerStoreTemp.setInterval(500);
-  else if (settingsOptsGraphCur == 2) timerStoreTemp.setInterval(1000);
-  else if (settingsOptsGraphCur == 3) timerStoreTemp.setInterval(2000);
-  else if (settingsOptsGraphCur == 4) timerStoreTemp.setInterval(5000);
-  else if (settingsOptsGraphCur == 5) timerStoreTemp.setInterval(10000);
-  else if (settingsOptsGraphCur == 6) timerStoreTemp.setInterval(15000);
-  else if (settingsOptsGraphCur == 7) timerStoreTemp.setInterval(30000);
-  else if (settingsOptsGraphCur == 8) timerStoreTemp.setInterval(60000);
-  else if (settingsOptsGraphCur == 9) timerStoreTemp.setInterval(120000);
-  else if (settingsOptsGraphCur == 10) timerStoreTemp.setInterval(30000);
-  else if (settingsOptsGraphCur == 11) timerStoreTemp.setInterval(600000);
-  else if (settingsOptsGraphCur == 12) timerStoreTemp.setInterval(900000);
-  else if (settingsOptsGraphCur == 13) timerStoreTemp.setInterval(1800000);
-  else if (settingsOptsGraphCur == 14) timerStoreTemp.setInterval(3600000);
-  else timerStoreTemp.setInterval(250);
-  timerStoreTemp.setReadyOnStart(true);
+  timerStoreTemp.setInterval(getStoreTempTimerInterval(settingsOptsGraphCur));
 }
 
 
@@ -518,7 +527,7 @@ void displayLive() {
 }
 
 
-
+// build graph on the display
 void displayGraph() {
   if (isDimmed) return;
 
@@ -617,7 +626,7 @@ void graphCursorMove(const int8_t dir) {
 }
 
 
-
+// show settings screen
 void displaySettings() {
   if (isDimmed) return;
 
@@ -639,6 +648,23 @@ void displaySettings() {
     }
     display.print(settingsNames[2]);
     display.drawRect(0, display.getCursorY()-2, 10*6+4, 12, SSD1306_WHITE);
+
+    // settings description
+    // graph timeout setting
+    if (settingSelected == 1) {
+      display.setCursor(4, 4);
+      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+
+      display.print(F("Max storage: "));
+      formatBackTime(MEASDATALENGTH * getStoreTempTimerInterval(settingsOptsGraphCur), tempStrBuf, 0);
+      // Serial.print(tempStrBuf);
+      // Serial.print(" <- ");
+      // Serial.println(MEASDATALENGTH * getStoreTempTimerInterval(settingsOptsGraphCur));
+      display.print(tempStrBuf[0]);
+      display.print(tempStrBuf[1]);
+      display.print(tempStrBuf[2]);
+      display.print(tempStrBuf[3]);
+    }
     
     display.display();
   }
