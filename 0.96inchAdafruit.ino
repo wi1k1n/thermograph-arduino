@@ -215,30 +215,25 @@ void loop() {
   }
   // triggers once after BTNHOLDTIMEOUT has passed
   if (btnL.isHolded()) {
-    if (!displayWakeUp()) {
-      // Serial.println(F("isHolded()"));
-      // if graph screen
-      if (menuScreen == 1) {
-        graphCursSteps = 0;
-        // if graphCursor mode not active
-        if (graphCurs >= MEASDATALENGTH) {
-          graphCurs = curs;
-          btnL.resetStates();
-        }
+    // if graph screen
+    if (menuScreen == 1) {
+      graphCursSteps = 0;
+      // if graphCursor mode not active
+      if (graphCurs >= MEASDATALENGTH) {
+        graphCurs = curs;
+        btnL.resetStates();
       }
-      // if settings screen
-      else if (menuScreen == 2) {
-        settingsHoldAction();
-        timeoutSaveLastMenu.start();
-      }
-      forceMenuRedraw = true;
     }
+    // if settings screen
+    else if (menuScreen == 2) {
+      settingsHoldAction();
+      timeoutSaveLastMenu.start();
+    }
+    forceMenuRedraw = true;
   }
   if (btnR.isHolded()) {
-    if (!displayWakeUp()) {
-      if (menuScreen == 1) {
-        graphCursSteps = 0;
-      }
+    if (menuScreen == 1) {
+      graphCursSteps = 0;
     }
   }
 
@@ -288,14 +283,12 @@ void loop() {
   }
   // both buttons are held
   if (btnL.isHold() && btnR.isHold()) {
-    if (!displayWakeUp()) {
-      // if on graph screen
-      if (menuScreen == 1) {
-        // if graphCursor mode is active
-        if (graphCurs < MEASDATALENGTH) {
-          graphCurs = 255;
-          forceMenuRedraw = true;
-        }
+    // if on graph screen
+    if (menuScreen == 1) {
+      // if graphCursor mode is active
+      if (graphCurs < MEASDATALENGTH) {
+        graphCurs = 255;
+        forceMenuRedraw = true;
       }
     }
   }
@@ -591,25 +584,24 @@ void displayGraph() {
   if (graphCurs < MEASDATALENGTH) {
     display.drawLine(graphCurs, DISPLAYPADDINGTOP, graphCurs, SCREEN_HEIGHT, SSD1306_WHITE);
     
+    
     display.fillRect(0, 0, SCREEN_WIDTH, DISPLAYPADDINGTOP, SSD1306_BLACK);
-
-    display.setCursor(0, 0);
-    display.setTextColor(SSD1306_WHITE);  // Draw white text
-    display.setTextSize(1);
-
     // draw current X position as -time
-    // TODO: graphCurs == curs  =>  shows 0.00 degrees!
-    int8_t curBackTime = (cycled ? (MEASDATALENGTH - 1) : curs) - graphCurs;
-    if (curBackTime >= 0) {
+    int16_t curBackTime = (cycled ? MEASDATALENGTH : (curs + 1)) - graphCurs;
+    if (curBackTime > 0) {
+      display.setCursor(0, 0);
+      display.setTextColor(SSD1306_WHITE);  // Draw white text
+      display.setTextSize(1);
+
       formatBackTime(curBackTime * timerStoreTemp.getInterval(), tempStrBuf, 1);
-      display.print('-');
+      if (curBackTime > 0) display.print('-');
       display.print(tempStrBuf[1]);
       display.print(tempStrBuf[2]);
       display.print(tempStrBuf[3]);
       display.print(tempStrBuf[4]);
       
       display.setCursor(display.getCursorX() + 8, 0);
-      dtostrf(measData[graphCurs], 6, 2, tempStrBuf);
+      dtostrf(measData[cycled ? ((curs + graphCurs) % MEASDATALENGTH) : (graphCurs - 1)], 6, 2, tempStrBuf);
       display.print(tempStrBuf);
     }
   }
