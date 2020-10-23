@@ -3,6 +3,7 @@
 #include <GyverTimer.h>
 #include <EEPROM.h>
 
+#include "logo.h"
 #include "thermistorMinim.h"
 
 
@@ -36,7 +37,7 @@
 #define DISPLAYPADDINGTOP 16
 #define DISPLAYDATAHEIGHT 64-16  // SCREEN_HEIGHT - DISPLAYPADDINGTOP
 // #define GRAPHYOFFSET (64 - 16) / 2  // DISPLAYDATAHEIGHT / 2
-#define DISPLAYLOGODURATION 500
+#define DISPLAYLOGODURATION 1000
 #define GRAPHPADDINGTOP 2
 #define GRAPHPADDINGBOT 2
 
@@ -328,6 +329,9 @@ void initDisplay() {
 
   // display.setRotation(2);
   display.cp437(true);  // Use full 256 char 'Code Page 437' font
+
+  display.clearDisplay();
+  display.drawBitmap(0, 0, logo_data, LOGO_WIDTH, LOGO_HEIGHT, SSD1306_WHITE);
   
   display.display();  // display is initialized with Adafruit splash screen
 }

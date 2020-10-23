@@ -13,6 +13,12 @@ Build a arduino-based thermometer.
 
 (Coming soon)
 
+## TODO list
+
+- Optimize memory usage
+- Optimize flash usage
+    - remove adafruit splash logo
+
 ## Known bugs
 
 - Time estimations r not accurate (should be rounded instead of flooring)
