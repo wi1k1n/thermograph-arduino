@@ -31,7 +31,7 @@
 #define DISPLAYPADDINGTOP 16
 #define DISPLAYDATAHEIGHT SCREEN_HEIGHT - DISPLAYPADDINGTOP  // SCREEN_HEIGHT - DISPLAYPADDINGTOP
 // #define GRAPHYOFFSET (64 - 16) / 2  // DISPLAYDATAHEIGHT / 2
-#define DISPLAYLOGODURATION 1000
+#define DISPLAYLOGODURATION 1500
 #define GRAPHPADDINGTOP 2  // extra padding for graph area (to make graph cursor visually more recognizable)
 #define GRAPHPADDINGBOT 2
 
@@ -44,6 +44,13 @@
 #define GRAPHBTNSTEPS4SPEED 15  // steps after which speed is increased by GRAPHBTNSPEED
 #define GRAPHBTNSPEED 2
 
+// Menu: Settings
+#define SETTINGSDIMMING         0
+#define SETTINGSGRAPHTIMEOUT    1
+#define SETTINGSRESET           2
+#define SETTINGSSAVE            3
+#define SETTINGSLOAD            4
+#define SETTINGSUSB             5
 
 
 // Steinhart–Hart equation (for thermistor) constants

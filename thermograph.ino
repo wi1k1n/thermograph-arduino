@@ -42,9 +42,9 @@ byte measMaxInd = 0;
 float scale = 2.f;
 
 // Menu variables
-byte menuScreen = 1;  // 0 - live temp, 1 - graph, 2 - settings
+byte menuScreen = MENUGRAPH;  // 0 - live temp, 1 - graph, 2 - settings
 bool forceMenuRedraw = true;  // can be set to force display methods to redraw. (display methods unset this flag!)
-byte settingSelected = 0;
+byte settingSelected = SETTINGSDIMMING;
 byte settingIsChanging = false;
 // https://www.arduino.cc/reference/en/language/variables/utilities/progmem/
 const char* const PROGMEM settingsNames[] = {"       Dimming:", " Graph timeout:", "Reset", "Save", "Load", "USB"};
@@ -107,7 +107,7 @@ void loop() {
     // if button has been pushed while active (not sleeping)
     if (!displayWakeUp()) {
       // if graph screen
-      if (menuScreen == 1) {
+      if (menuScreen == MENUGRAPH) {
         // graphCursor mode active
         if (graphCurs < MEASDATALENGTH) {
           if (!btnR.isHold()) {
@@ -121,7 +121,7 @@ void loop() {
   if (btnR.isPress()) {
     // if button has been pushed while active (not sleeping)
     if (!displayWakeUp()) {
-      if (menuScreen == 1) {
+      if (menuScreen == MENUGRAPH) {
         // graphCursor mode active
         if (graphCurs < MEASDATALENGTH) {
           if (!btnL.isHold()) {
@@ -135,9 +135,9 @@ void loop() {
 
   if (btnL.isSingle()) {
     // no need for displayWakeUp, since it is already done in isPress() check
-    if (menuScreen == 1) {}
+    if (menuScreen == MENUGRAPH) {}
     // if settings screen
-    else if (menuScreen == 2) {
+    else if (menuScreen == MENUSETTINGS) {
         // if in process of changing settings
         if (settingIsChanging) {
           incrementSettingSelected(-1);
@@ -153,14 +153,14 @@ void loop() {
   }
   if (btnR.isSingle()) {
     // if graph screen
-    if (menuScreen == 1) {
+    if (menuScreen == MENUGRAPH) {
       // graphCursor mode active
       if (graphCurs >= MEASDATALENGTH) {
         changeMenuScreen(1);
       }
     }
     // if settings screen
-    else if (menuScreen == 2) {
+    else if (menuScreen == MENUSETTINGS) {
       // if in process of changing settings
       if (settingIsChanging) {
         incrementSettingSelected(1);
@@ -178,7 +178,7 @@ void loop() {
   // triggers once after BTNHOLDTIMEOUT has passed
   if (btnL.isHolded()) {
     // if graph screen
-    if (menuScreen == 1) {
+    if (menuScreen == MENUGRAPH) {
       graphCursSteps = 0;
       // if graphCursor mode not active
       if (graphCurs >= MEASDATALENGTH) {
@@ -187,14 +187,14 @@ void loop() {
       }
     }
     // if settings screen
-    else if (menuScreen == 2) {
+    else if (menuScreen == MENUSETTINGS) {
       settingsHoldAction();
       timeoutSaveLastMenu.start();
     }
     forceMenuRedraw = true;
   }
   if (btnR.isHolded()) {
-    if (menuScreen == 1) {
+    if (menuScreen == MENUGRAPH) {
       graphCursSteps = 0;
     }
   }
@@ -202,9 +202,9 @@ void loop() {
   if (btnL.isRelease()) {
     if (!displayWakeUp()) {
       // if settings screen
-      if (menuScreen == 2) {
-        // if button selected (currently only at index 2)
-        if (settingSelected == 2) {
+      if (menuScreen == MENUSETTINGS) {
+        // if reset button selected
+        if (settingSelected == SETTINGSRESET) {
           // if holded before (not single release)
           if (settingIsChanging) {
             // Serial.println(F("hbr"));
@@ -220,7 +220,7 @@ void loop() {
   if (btnL.isStep()) {
     if (!displayWakeUp()) {
       // if on graph screen
-      if (menuScreen == 1) {
+      if (menuScreen == MENUGRAPH) {
         // if graphCursor mode is active
         if (graphCurs < MEASDATALENGTH) {
           // Serial.println(btnL.getHoldClicks());
@@ -234,7 +234,7 @@ void loop() {
   if (btnR.isStep()) {
     if (!displayWakeUp()) {
       // if on graph screen
-      if (menuScreen == 1) {
+      if (menuScreen == MENUGRAPH) {
         // if graphCursor mode is active
         if (graphCurs < MEASDATALENGTH) {
           graphCursorMove(++graphCursSteps < GRAPHBTNSTEPS4SPEED ? 1 : GRAPHBTNSPEED);
@@ -246,7 +246,7 @@ void loop() {
   // both buttons are held
   if (btnL.isHold() && btnR.isHold()) {
     // if on graph screen
-    if (menuScreen == 1) {
+    if (menuScreen == MENUGRAPH) {
       // if graphCursor mode is active
       if (graphCurs < MEASDATALENGTH) {
         graphCurs = 255;
@@ -255,9 +255,9 @@ void loop() {
     }
   }
 
-  if (menuScreen == 0) {
+  if (menuScreen == MENULIVE) {
     displayLive();
-  } else if (menuScreen == 1) {
+  } else if (menuScreen == MENUGRAPH) {
     displayGraph();
   } else {
     displaySettings();
@@ -383,16 +383,16 @@ void updateDimTimer() {
 
 // changing value of changing setting
 void incrementSettingSelected(const int8_t &dir) {
-    if (settingSelected == 0)
+    if (settingSelected == SETTINGSDIMMING)
       settingsOptsDimmingCur = (settingsOptsDimmingCur + dir) < 0 ? (SETTINGSOPTSDIMMINGSIZE-1) : ((settingsOptsDimmingCur + dir) % SETTINGSOPTSDIMMINGSIZE);
-    else if (settingSelected == 1)
+    else if (settingSelected == SETTINGSGRAPHTIMEOUT)
       settingsOptsGraphCur = (settingsOptsGraphCur + dir) < 0 ? (SETTINGSOPTSGRAPHSIZE-1) : ((settingsOptsGraphCur + dir) % SETTINGSOPTSGRAPHSIZE);
 }
 
 // is called when holded action button on settings menu
 void settingsHoldAction() {
-  // if button selected (currently only button at index 2)
-  if (settingSelected == 2) {
+  // if reset button
+  if (settingSelected == SETTINGSRESET) {
     // Serial.println(F("hb"));
     curs = 0;
     cycled = false;
@@ -411,11 +411,15 @@ void settingsHoldAction() {
     settingIsChanging = true;
     forceMenuRedraw = true;
   }
+  // if save button
+  else if (settingSelected == SETTINGSSAVE) {
+
+  }
   // if changable setting is selected
   else {
     if (settingIsChanging) {
       // changing dimming interval
-      if (settingSelected == 0) {
+      if (settingSelected == SETTINGSDIMMING) {
         setDisplayDimTimer();
         if (timerDisplayDim.isEnabled()) {
           forceMenuRedraw = true;
@@ -423,7 +427,7 @@ void settingsHoldAction() {
         }
       }
       // changing graph timeout setting
-      else if (settingSelected == 1) {
+      else if (settingSelected == SETTINGSGRAPHTIMEOUT) {
         setStoreTempTimer();
         timerStoreTemp.start();
       }
@@ -592,23 +596,23 @@ void displaySettings() {
     display.setTextSize(1);
 
     // dimming & graph timeout
-    displaySettingsEntry(0, PGM_READ_CHARARR(settingsNames[0]), PGM_READ_CHARARR(settingsOptsDimming[settingsOptsDimmingCur]));
-    displaySettingsEntry(1, PGM_READ_CHARARR(settingsNames[1]), PGM_READ_CHARARR(settingsOptsGraph[settingsOptsGraphCur]));
+    displaySettingsEntry(SETTINGSDIMMING, PGM_READ_CHARARR(settingsNames[0]), PGM_READ_CHARARR(settingsOptsDimming[settingsOptsDimmingCur]));
+    displaySettingsEntry(SETTINGSGRAPHTIMEOUT, PGM_READ_CHARARR(settingsNames[1]), PGM_READ_CHARARR(settingsOptsGraph[settingsOptsGraphCur]));
 
     // save, load, usb button
     const byte PROGMEM SLULEFTPADDING = 6;  // SaveLoadUsbLeftPadding
     const byte PROGMEM SLUY = (DISPLAYPADDINGTOP+2) + 12*2;
-    
+
     // clear data
-    displaySettingsButton(2, SLULEFTPADDING, SLUY, 5, PGM_READ_CHARARR(settingsNames[2]));
-    displaySettingsButton(3, display.getCursorX() + 3, SLUY, 4, PGM_READ_CHARARR(settingsNames[3]));
-    displaySettingsButton(4, display.getCursorX() + 3, SLUY, 4, PGM_READ_CHARARR(settingsNames[4]));
-    displaySettingsButton(5, display.getCursorX() + 3, SLUY, 3, PGM_READ_CHARARR(settingsNames[5]));
+    displaySettingsButton(SETTINGSRESET, SLULEFTPADDING, SLUY, 5, PGM_READ_CHARARR(settingsNames[2]));
+    displaySettingsButton(SETTINGSSAVE, display.getCursorX() + 3, SLUY, 4, PGM_READ_CHARARR(settingsNames[3]));
+    displaySettingsButton(SETTINGSLOAD, display.getCursorX() + 3, SLUY, 4, PGM_READ_CHARARR(settingsNames[4]));
+    displaySettingsButton(SETTINGSUSB, display.getCursorX() + 3, SLUY, 3, PGM_READ_CHARARR(settingsNames[5]));
 
 
     // settings description
     // graph timeout setting
-    if (settingSelected == 1) {
+    if (settingSelected == SETTINGSGRAPHTIMEOUT) {
       display.setCursor(4, 4);
       display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
 
