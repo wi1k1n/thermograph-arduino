@@ -16,12 +16,16 @@ Build a arduino-based thermometer.
 ## TODO list
 
 - Optimize memory usage
+    - Display lib takes ~200 bytes of SRAM (+1KB is allocated dynamically on Heap)
+    - Timers don't need all the internal variables (now each takes 13 bytes => 65 bytes in total)
+    - Each GButton take ~23 bytes (could be less?), so ~46 bytes in total
 - Optimize flash usage
     - remove adafruit splash logo
 
 ## Known bugs
 
 - Time estimations r not accurate (should be rounded instead of flooring)
+- No time memory (only considers current graph timeout setting, even if the whole graph has been built with different graph timeout)
 - Low memory
 
 ## 

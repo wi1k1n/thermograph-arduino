@@ -1,3 +1,16 @@
+// converts 0..1023 value from analog input to degrees of Celsius
+float computeTemp(const float &analogValue) {
+  // Constants and formulas are from:
+  // https://www.circuitbasics.com/arduino-thermistor-temperature-sensor-tutorial/
+  // Nice mini-class for thermistor is from:
+  // https://github.com/AlexGyver/GyverLibs/tree/master/minimLibs/thermistor
+  // Wiring:
+  // GND --- thermistor --- A0 --- 10k --- 5V
+  float logR2 = log(R1 * (1023.f / analogValue - 1.f));
+  return (1.f / (C1 + C2*logR2 + C3*logR2*logR2*logR2)) - 273.15f;
+}
+
+// takes time in MS and writes 4 chars to buffer (starting from startInd) of formatted time
 void formatBackTime(uint32_t ms, char* tempStrBuf, byte startInd) {
   uint32_t t;
   if (ms < 10000) {  // < 10s
