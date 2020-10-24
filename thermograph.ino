@@ -55,7 +55,7 @@ const char* const PROGMEM settingsOptsDimming[] = {"off ", " 5s ", "10s ", "15s 
 byte settingsOptsDimmingCur = 3;
 const char* const PROGMEM settingsOptsGraph[] = {".25s", ".5s ", " 1s ", " 2s ", " 5s ", "10s ", "15s ", "30s ", " 1m ", " 2m ", " 5m ", "10m ", "15m ", "30m ", " 1h "};
 const uint16_t PROGMEM settingsOptsGraphVals[] = {250, 500, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600};
-const uint16_t PROGMEM settingsOptsGraphValsMSMask = 0b1100000000000001;
+const uint16_t PROGMEM settingsOptsGraphValsMSMask = 0b1100000000000001;  // 1 if value in ms, 0 - if in s
 #define SETTINGSOPTSGRAPHSIZE 15  // no more than 16!
 byte settingsOptsGraphCur = 1;
 
@@ -211,6 +211,16 @@ void loop() {
             settingIsChanging = false;
             forceMenuRedraw = true;
           }
+        } else if (settingSelected == SETTINGSSAVE) {
+          if (settingIsChanging) {
+            settingIsChanging = false;
+            forceMenuRedraw = true;
+          }
+        } else if (settingSelected == SETTINGSLOAD) {
+          if (settingIsChanging) {
+            settingIsChanging = false;
+            forceMenuRedraw = true;
+          }
         }
       }
     }
@@ -328,7 +338,7 @@ void initButtons() {
   btnR.setStepTimeout(BTNSTEPTIMEOUT);
 }
 void initSensors() {
-  // here both are initialized and first measurement made
+  // here both sensors are initialized and the first measurement made
   measurePartial();
 }
 void initTimers() {
@@ -389,11 +399,9 @@ void incrementSettingSelected(const int8_t &dir) {
       settingsOptsGraphCur = (settingsOptsGraphCur + dir) < 0 ? (SETTINGSOPTSGRAPHSIZE-1) : ((settingsOptsGraphCur + dir) % SETTINGSOPTSGRAPHSIZE);
 }
 
-// is called when holded action button on settings menu
-void settingsHoldAction() {
-  // if reset button
-  if (settingSelected == SETTINGSRESET) {
-    // Serial.println(F("hb"));
+
+// remove stored data
+void onButtonReset() {
     curs = 0;
     cycled = false;
     measChanged = true;
@@ -407,14 +415,83 @@ void settingsHoldAction() {
     scale = 2.f;
     measurePartial();
     setStoreTempTimer();
+}
+// save stored data to eeprom
+void onButtonSave() {
+  // first 5 bytes of eeprom contain service info:
+  //           b0                         b1                        b2
+  // 39 38 37 36 35 34 33 32 | 31 30 29 28 27 26 25 24 | 23 22 21 20 19 18 17 16 |
+  // <------ indexOfStart (10bits) ------> <------ lengthOfData (10bits) ------>   
+  //            b3                     b4
+  // 15 14 13 12 11 10 09 08 |  7 6 5     4 3 2 1 0
+  // <------ minTemp ------>  resolution
+  uint32_t indLenMin;
+  EEPROM.get(0, indLenMin);
+  uint16_t indOfStart = indLenMin >> 20;
+  // first 5 bytes and last 2 bytes are reserved as service storage
+  if (indOfStart < 5 || indOfStart >= EEPROM.length() - 2) indOfStart = 5;
+  // if (dataLength > EEPROM.length() - 2 - 5) dataLength = EEPROM.length() - 2 - 5;
+  
+  // put measured data to eeprom byte-by-byte
+  uint16_t i = cycled ? (curs + 1) : 0;
+  uint16_t shift = 0;
+  for (;; i++, shift++) {
+    if (i == MEASDATALENGTH) i = 0;  // wrap around i
+    if (i == curs) break;  // stop condition
+    EEPROM.put(indOfStart + shift, measData[i]);
+  }
 
+  // update cursor & length
+  indLenMin = (indOfStart << 12 | (shift & 0x0FFF)) << 8;
+  EEPROM.put(0, indLenMin);
+  EEPROM.put(4, 0);  // this is a placeholder for now
+}
+// load data from eeprom
+void onButtonLoad() {
+  // check the scheme in onButtonSave method
+  uint32_t indLenMin;
+  EEPROM.get(0, indLenMin);
+  uint16_t indOfStart = indLenMin >> 20;
+  uint16_t dataLength = (indLenMin >> 8) & 0xFFF;
+  if (indOfStart < 5 || indOfStart >= EEPROM.length() - 2) indOfStart = 5;
+  if (dataLength > EEPROM.length() - 2 - 5) dataLength = EEPROM.length() - 2 - 5;
+
+  // load measurements byte-by-byte
+  for (uint16_t i = 0; i < dataLength; i++, indOfStart++) {
+    if (indOfStart >= EEPROM.length() - 2) indOfStart = 5;
+    EEPROM.get(indOfStart, measData[i]);
+  }
+  cycled = dataLength >= MEASDATALENGTH;
+  curs = cycled ? 0 : dataLength;
+  recalculateMin();
+  recalculateMax();
+  recalculateRange();
+  if (measMin < measMinG) measMinG = measMin;
+  if (measMax > measMaxG) measMaxG = measMax;
+  
+  tempValPartAverage = 0;
+  tempValN = 0;
+  measurePartial();
+}
+// turn USB synchronization mode on
+void onButtonUSB() {
+
+}
+// is called when holded action button on settings menu
+void settingsHoldAction() {
+  if (settingSelected == SETTINGSRESET) {
+    onButtonReset();
     settingIsChanging = true;
-    forceMenuRedraw = true;
   }
-  // if save button
   else if (settingSelected == SETTINGSSAVE) {
-
+    onButtonSave();
+    settingIsChanging = true;
   }
+  else if (settingSelected == SETTINGSLOAD) {
+    onButtonLoad();
+    settingIsChanging = true;
+  }
+  else if (settingSelected == SETTINGSUSB) onButtonUSB();
   // if changable setting is selected
   else {
     if (settingIsChanging) {
@@ -422,7 +499,6 @@ void settingsHoldAction() {
       if (settingSelected == SETTINGSDIMMING) {
         setDisplayDimTimer();
         if (timerDisplayDim.isEnabled()) {
-          forceMenuRedraw = true;
           updateDimTimer();
         }
       }
@@ -692,16 +768,12 @@ void storeMeasurement() {
     measMinInd = curs;
     recalcMin = false;
     recalcRange = true;
-    // Serial.print("measMin: ");
-    // Serial.println(measMin);
   }
   if (temp > measMax) {
     measMax = temp;
     measMaxInd = curs;
     recalcMax = false;
     recalcRange = true;
-    // Serial.print("measMax: ");
-    // Serial.println(measMax);
   }
   // update global min/max
   if (temp < measMinG) measMinG = temp;
@@ -719,37 +791,44 @@ void storeMeasurement() {
   // recalc min/max if needed
   if (recalcMin) {
     recalcRange = true;
-    measMin = INT32_MAX;
-    byte i = cycled ? (curs + 1) : 0;
-    for (;; i++) {
-      if (i == MEASDATALENGTH) i = 0;
-      if (i == curs) break;
-      if (measData[i] < measMin) {
-        measMin = measData[i];
-        measMinInd = i;
-      }
-    }
+    recalculateMin();
   }
   if (recalcMax) {
     recalcRange = true;
-    measMax = (float)INT32_MIN;
-    byte i = cycled ? (curs + 1) : 0;
-    for (;; i++) {
-      if (i == MEASDATALENGTH) i = 0;
-      if (i == curs) break;
-      if (measData[i] > measMax) {
-        measMax = measData[i];
-        measMaxInd = i;
-      }
-    }
+    recalculateMax();
   }
   if (recalcMin || recalcMax || recalcRange) {
-    measMin8 = measMin;
-    int8_t range = (int8_t)measMax - measMin8;  // calculate in bytes for scale to correspond correctly to screen height
-    if (range >= 1) scale = (float)(DISPLAYDATAHEIGHT - 1 - (GRAPHPADDINGTOP + GRAPHPADDINGBOT)) / range;  // use this for aligning graph vertically to the center
-    else scale = 2.f;
-    
-    // Serial.print("; scale: ");
-    // Serial.println(scale);
+    recalculateRange();
   }
+}
+
+void recalculateMin() {
+  measMin = INT32_MAX;
+  byte i = cycled ? (curs + 1) : 0;
+  for (;; i++) {
+    if (i == MEASDATALENGTH) i = 0;
+    if (i == curs) break;
+    if (measData[i] < measMin) {
+      measMin = measData[i];
+      measMinInd = i;
+    }
+  }
+}
+void recalculateMax() {
+  measMax = (float)INT32_MIN;
+  byte i = cycled ? (curs + 1) : 0;
+  for (;; i++) {
+    if (i == MEASDATALENGTH) i = 0;
+    if (i == curs) break;
+    if (measData[i] > measMax) {
+      measMax = measData[i];
+      measMaxInd = i;
+    }
+  }
+}
+void recalculateRange() {
+  measMin8 = measMin;
+  int8_t range = (int8_t)measMax - measMin8;  // calculate in bytes for scale to correspond correctly to screen height
+  if (range >= 1) scale = (float)(DISPLAYDATAHEIGHT - 1 - (GRAPHPADDINGTOP + GRAPHPADDINGBOT)) / range;  // use this for aligning graph vertically to the center
+  else scale = 2.f;
 }
