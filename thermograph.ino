@@ -43,6 +43,7 @@ float scale = 2.f;
 
 // Menu variables
 byte menuScreen = MENUGRAPH;  // 0 - live temp, 1 - graph, 2 - settings
+byte menuScreenLast = menuScreen;  // restore correct after settings
 bool forceMenuRedraw = true;  // can be set to force display methods to redraw. (display methods unset this flag!)
 byte settingSelected = SETTINGSDIMMING;
 byte settingIsChanging = false;
@@ -135,7 +136,12 @@ void loop() {
 
   if (btnL.isSingle()) {
     // no need for displayWakeUp, since it is already done in isPress() check
-    if (menuScreen == MENUGRAPH) {}
+    if (menuScreen == MENULIVE) {
+      changeMenuScreen(MENUGRAPH);
+    }
+    else if (menuScreen == MENUGRAPH) {
+      changeMenuScreen(MENULIVE);
+    }
     // if settings screen
     else if (menuScreen == MENUSETTINGS) {
         // if in process of changing settings
@@ -144,8 +150,8 @@ void loop() {
         }
         // if not changing settings atm
         else {
-          // Serial.println("btnL -> not changing");
-          settingSelected = (settingSelected + 1) % SETTINGSNAMESSIZE;
+          // focus previous setting
+          settingSelected = settingSelected == 0 ? (SETTINGSNAMESSIZE - 1) : (settingSelected - 1);
           // timeoutSaveLastMenu.start(); // probably not needed
         }
     }
@@ -153,10 +159,12 @@ void loop() {
   }
   if (btnR.isSingle()) {
     // if graph screen
-    if (menuScreen == MENUGRAPH) {
-      // graphCursor mode active
+    if (menuScreen == MENULIVE) {
+      changeMenuScreen(MENUGRAPH);
+    } else if (menuScreen == MENUGRAPH) {
+      // graphCursor mode not active
       if (graphCurs >= MEASDATALENGTH) {
-        changeMenuScreen(1);
+        changeMenuScreen(MENULIVE);
       }
     }
     // if settings screen
@@ -167,11 +175,8 @@ void loop() {
       }
       // if not changing settings
       else {
-        changeMenuScreen(1);
+          settingSelected = (settingSelected + 1) % SETTINGSNAMESSIZE;
       }
-    }
-    else {
-      changeMenuScreen(1);
     }
     forceMenuRedraw = true;
   }
@@ -194,15 +199,28 @@ void loop() {
     forceMenuRedraw = true;
   }
   if (btnR.isHolded()) {
-    if (menuScreen == MENUGRAPH) {
-      graphCursSteps = 0;
+    if (menuScreen == MENULIVE) {
+        menuScreenLast = menuScreen;
+        changeMenuScreen(MENUSETTINGS);
+    } else if (menuScreen == MENUGRAPH) {
+      graphCursSteps = 0;  // set g-cursor steps to 0 (after them the speed is bigger when holding)
+      // if not in graph cursor mode
+      if (graphCurs >= MEASDATALENGTH) {
+        // save current menu screen to restore exactly to it later
+        menuScreenLast = menuScreen;
+        changeMenuScreen(MENUSETTINGS);
+      }
+    } else if (menuScreen == MENUSETTINGS) {
+      changeMenuScreen(menuScreenLast);
     }
+    forceMenuRedraw = true;
   }
 
   if (btnL.isRelease()) {
     if (!displayWakeUp()) {
       // if settings screen
       if (menuScreen == MENUSETTINGS) {
+        // TODO: refactor this code!
         // if reset button selected
         if (settingSelected == SETTINGSRESET) {
           // if holded before (not single release)
@@ -357,8 +375,8 @@ void initTimers() {
   timeoutSaveLastMenu.stop();
 }
 
-void changeMenuScreen(int8_t dir) {
-  menuScreen = (menuScreen + 1) % 3;
+void changeMenuScreen(const uint8_t menu) {
+  menuScreen = menu % 3;
   timeoutSaveLastMenu.start();
 }
 // either wakes arduino up and resets dimTimeout, or just resets timeout.

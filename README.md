@@ -25,9 +25,11 @@ Build a arduino-based thermometer.
 
 ## Known bugs
 
-- After [Load] the range is wrong
-- On [Save] theres high eeprom wear (need to consequently slide cursor)
 - Time estimations r not accurate (should be rounded instead of flooring)
 - No time memory (only considers current graph timeout setting, even if the whole graph has been built with different graph timeout)
 - Low memory
+
+### FIXED:
++ After [Load] the range is wrong
++ On [Save] theres high eeprom wear (need to consequently slide cursor)
 ## 
