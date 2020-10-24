@@ -211,7 +211,9 @@ void loop() {
         changeMenuScreen(MENUSETTINGS);
       }
     } else if (menuScreen == MENUSETTINGS) {
-      changeMenuScreen(menuScreenLast);
+      if (!settingIsChanging) {
+        changeMenuScreen(menuScreenLast);
+      }
     }
     forceMenuRedraw = true;
   }
