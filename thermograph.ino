@@ -425,24 +425,32 @@ void onButtonSave() {
   //            b3                     b4
   // 15 14 13 12 11 10 09 08 |  7 6 5     4 3 2 1 0
   // <------ minTemp ------>  resolution
+
+  // get cursor & length of last saving iteration
   uint32_t indLenMin;
   EEPROM.get(0, indLenMin);
   uint16_t indOfStart = indLenMin >> 20;
+  uint16_t dataLength = (indLenMin >> 8) & 0xFFF;
+  // validate and "constrain"
   // first 5 bytes and last 2 bytes are reserved as service storage
   if (indOfStart < 5 || indOfStart >= EEPROM.length() - 2) indOfStart = 5;
-  // if (dataLength > EEPROM.length() - 2 - 5) dataLength = EEPROM.length() - 2 - 5;
+  if (dataLength > EEPROM.length() - 2 - 5) dataLength = EEPROM.length() - 2 - 5;
   
+  // calculate start index for current saving (for reducing eeprom wear)
+  uint32_t startShift = indOfStart + dataLength;
+  if (startShift >= EEPROM.length() - 2) startShift = 5;
+
   // put measured data to eeprom byte-by-byte
-  uint16_t i = cycled ? (curs + 1) : 0;
-  uint16_t shift = 0;
+  uint8_t i = cycled ? (curs + 1) : 0;  // uint16_t for MEGA
+  uint8_t shift = 0;  // uint16_t for MEGA
   for (;; i++, shift++) {
     if (i == MEASDATALENGTH) i = 0;  // wrap around i
     if (i == curs) break;  // stop condition
-    EEPROM.put(indOfStart + shift, measData[i]);
+    EEPROM.put(startShift + shift, measData[i]);
   }
 
   // update cursor & length
-  indLenMin = (indOfStart << 12 | (shift & 0x0FFF)) << 8;
+  indLenMin = (startShift << 12 | (shift & 0x0FFF)) << 8;
   EEPROM.put(0, indLenMin);
   EEPROM.put(4, 0);  // this is a placeholder for now
 }
@@ -454,20 +462,35 @@ void onButtonLoad() {
   uint16_t indOfStart = indLenMin >> 20;
   uint16_t dataLength = (indLenMin >> 8) & 0xFFF;
   if (indOfStart < 5 || indOfStart >= EEPROM.length() - 2) indOfStart = 5;
-  if (dataLength > EEPROM.length() - 2 - 5) dataLength = EEPROM.length() - 2 - 5;
+  uint16_t dataLengthMax = min(EEPROM.length() - 2 - 5, MEASDATALENGTH);
+  if (dataLength > dataLengthMax) dataLength = dataLengthMax;
+  // if (dataLength > EEPROM.length() - 2 - 5) dataLength = EEPROM.length() - 2 - 5;
 
   // load measurements byte-by-byte
-  for (uint16_t i = 0; i < dataLength; i++, indOfStart++) {
+  for (uint8_t i = 0; i < dataLength; i++, indOfStart++) {  // uint16_t for MEGA
     if (indOfStart >= EEPROM.length() - 2) indOfStart = 5;
     EEPROM.get(indOfStart, measData[i]);
   }
   cycled = dataLength >= MEASDATALENGTH;
   curs = cycled ? 0 : dataLength;
+
+  // display.setCursor(0, 0);
+  // display.setTextColor(SSD1306_WHITE);
+  // display.setTextSize(1);
+
+  // display.print(measMin);
+  // display.print(' ');
+
   recalculateMin();
   recalculateMax();
   recalculateRange();
   if (measMin < measMinG) measMinG = measMin;
   if (measMax > measMaxG) measMaxG = measMax;
+
+  // display.print(measMin);
+  // display.display();
+
+  // delay(1000);
   
   tempValPartAverage = 0;
   tempValN = 0;
