@@ -2,6 +2,7 @@
 #include <GyverButton.h>
 #include <GyverTimer.h>
 #include <EEPROM.h>
+#include <GyverUART.h>
 
 #include "constants.h"
 #include "logo.h"
@@ -9,7 +10,8 @@
 
 #define PGM_READ_CHARARR(val) (char*)pgm_read_word(&val)
 
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+Adafruit_SSD1306* display = new Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+boolean displayEnabled = true;
 
 GButton btnL(BTNLEFT_PIN, LOW_PULL);
 GButton btnR(BTNRIGHT_PIN, LOW_PULL);
@@ -80,14 +82,14 @@ void setup() {
   // Serial.print("GRAPHYOFFSET: ");
   // Serial.println(GRAPHYOFFSET);
 
-  initDisplay();
+  initDisplay(true);
   initParamsFromEEPROM();
   initButtons();
   initSensors();
   initTimers();
   
   delay(DISPLAYLOGODURATION);
-  display.clearDisplay();
+  display->clearDisplay();
 }
 
 void loop() {
@@ -144,6 +146,7 @@ void loop() {
     }
     // if settings screen
     else if (menuScreen == MENUSETTINGS) {
+      if (displayEnabled) {
         // if in process of changing settings
         if (settingIsChanging) {
           incrementSettingSelected(-1);
@@ -154,6 +157,7 @@ void loop() {
           settingSelected = settingSelected == 0 ? (SETTINGSNAMESSIZE - 1) : (settingSelected - 1);
           // timeoutSaveLastMenu.start(); // probably not needed
         }
+      }
     }
     forceMenuRedraw = true;
   }
@@ -169,13 +173,15 @@ void loop() {
     }
     // if settings screen
     else if (menuScreen == MENUSETTINGS) {
-      // if in process of changing settings
-      if (settingIsChanging) {
-        incrementSettingSelected(1);
-      }
-      // if not changing settings
-      else {
+      if (displayEnabled) {
+        // if in process of changing settings
+        if (settingIsChanging) {
+          incrementSettingSelected(1);
+        }
+        // if not changing settings
+        else {
           settingSelected = (settingSelected + 1) % SETTINGSNAMESSIZE;
+        }
       }
     }
     forceMenuRedraw = true;
@@ -193,8 +199,12 @@ void loop() {
     }
     // if settings screen
     else if (menuScreen == MENUSETTINGS) {
-      settingsHoldAction();
-      timeoutSaveLastMenu.start();
+      if (displayEnabled) {
+        settingsHoldAction();
+        timeoutSaveLastMenu.start();
+      } else {
+        endSerialUSB();
+      }
     }
     forceMenuRedraw = true;
   }
@@ -211,8 +221,10 @@ void loop() {
         changeMenuScreen(MENUSETTINGS);
       }
     } else if (menuScreen == MENUSETTINGS) {
-      if (!settingIsChanging) {
-        changeMenuScreen(menuScreenLast);
+      if (displayEnabled) {
+        if (!settingIsChanging) {
+          changeMenuScreen(menuScreenLast);
+        }
       }
     }
     forceMenuRedraw = true;
@@ -222,24 +234,26 @@ void loop() {
     if (!displayWakeUp()) {
       // if settings screen
       if (menuScreen == MENUSETTINGS) {
-        // TODO: refactor this code!
-        // if reset button selected
-        if (settingSelected == SETTINGSRESET) {
-          // if holded before (not single release)
-          if (settingIsChanging) {
-            // Serial.println(F("hbr"));
-            settingIsChanging = false;
-            forceMenuRedraw = true;
-          }
-        } else if (settingSelected == SETTINGSSAVE) {
-          if (settingIsChanging) {
-            settingIsChanging = false;
-            forceMenuRedraw = true;
-          }
-        } else if (settingSelected == SETTINGSLOAD) {
-          if (settingIsChanging) {
-            settingIsChanging = false;
-            forceMenuRedraw = true;
+        if (displayEnabled) {
+          // TODO: refactor this code!
+          // if reset button selected
+          if (settingSelected == SETTINGSRESET) {
+            // if holded before (not single release)
+            if (settingIsChanging) {
+              // Serial.println(F("hbr"));
+              settingIsChanging = false;
+              forceMenuRedraw = true;
+            }
+          } else if (settingSelected == SETTINGSSAVE) {
+            if (settingIsChanging) {
+              settingIsChanging = false;
+              forceMenuRedraw = true;
+            }
+          } else if (settingSelected == SETTINGSLOAD) {
+            if (settingIsChanging) {
+              settingIsChanging = false;
+              forceMenuRedraw = true;
+            }
           }
         }
       }
@@ -302,11 +316,32 @@ void loop() {
   if (timeoutSaveLastMenu.isReady()){
     saveParams2EEPROM();
   }
+
+  // receive commands via USB
+  if (!displayEnabled) {
+    if (uart.available()) {
+      byte cmd = uart.read();
+      if (cmd == USBCMD_SERVICE) {
+        uart.print(settingsOptsGraphCur);
+      } else {
+        uart.print(F("HEY!"));
+      }
+    }
+    // if (bts > 0) {
+    //   for (uint8_t i = 0; i < bts; i++)
+    //     uart.print((byte)uart.read());
+    //     uart.print(' ');
+    // }
+  }
 }
 
-void initDisplay() {
+void destroyDisplay() {
+  delete display;
+  display = NULL;
+}
+void initDisplay(const boolean logo) {
   // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
-  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {  // 0x3c - display address
+  if(!display->begin(SSD1306_SWITCHCAPVCC, 0x3C)) {  // 0x3c - display address
     // Serial.println(F("SSD1306 allocation failed"));
     pinMode(LED_BUILTIN, OUTPUT);
     for(;;) {
@@ -318,13 +353,16 @@ void initDisplay() {
     }
   }
 
-  // display.setRotation(2);
-  display.cp437(true);  // Use full 256 char 'Code Page 437' font
+  // display->setRotation(2);
+  display->cp437(true);  // Use full 256 char 'Code Page 437' font
 
-  display.clearDisplay();
-  display.drawBitmap(0, 0, logo_data, LOGO_WIDTH, LOGO_HEIGHT, SSD1306_WHITE);
+  display->clearDisplay();
+
+  if (logo) {
+    display->drawBitmap(0, 0, logo_data, LOGO_WIDTH, LOGO_HEIGHT, SSD1306_WHITE);
+  }
   
-  display.display();  // display is initialized with Adafruit splash screen
+  display->display();  // display is initialized with Adafruit splash screen
 }
 // takes 
 void initParamsFromEEPROM() {
@@ -384,6 +422,7 @@ void changeMenuScreen(const uint8_t menu) {
 // either wakes arduino up and resets dimTimeout, or just resets timeout.
 // returns true, if woke up, false, if only timeout has been reset
 bool displayWakeUp() {
+  if (!displayEnabled) return;
   if (isDimmed) {
     dim(false);
     return true;
@@ -394,20 +433,20 @@ bool displayWakeUp() {
 }
 // either turns dim on or off
 void dim(const bool v) {
-  if (!timerDisplayDim.isEnabled()) return;
+  if (!displayEnabled || !timerDisplayDim.isEnabled()) return;
   if (!v) {
     // Serial.println(F("cl"));
     updateDimTimer();
     // clear display to not have any flashing screens
-    display.clearDisplay();
-    display.display();
+    display->clearDisplay();
+    display->display();
   }
-  display.dim(v);
+  display->dim(v);
   isDimmed = v;
 }
 // resets timeout 
 void updateDimTimer() {
-  if (!timerDisplayDim.isEnabled()) return;
+  if (!displayEnabled || !timerDisplayDim.isEnabled()) return;
   timerDisplayDim.start();
 }
 
@@ -494,12 +533,12 @@ void onButtonLoad() {
   cycled = dataLength >= MEASDATALENGTH;
   curs = cycled ? 0 : dataLength;
 
-  // display.setCursor(0, 0);
-  // display.setTextColor(SSD1306_WHITE);
-  // display.setTextSize(1);
+  // display->setCursor(0, 0);
+  // display->setTextColor(SSD1306_WHITE);
+  // display->setTextSize(1);
 
-  // display.print(measMin);
-  // display.print(' ');
+  // display->print(measMin);
+  // display->print(' ');
 
   recalculateMin();
   recalculateMax();
@@ -507,8 +546,8 @@ void onButtonLoad() {
   if (measMin < measMinG) measMinG = measMin;
   if (measMax > measMaxG) measMaxG = measMax;
 
-  // display.print(measMin);
-  // display.display();
+  // display->print(measMin);
+  // display->display();
 
   // delay(1000);
   
@@ -518,7 +557,26 @@ void onButtonLoad() {
 }
 // turn USB synchronization mode on
 void onButtonUSB() {
+  display->clearDisplay();
+  display->setTextSize(2);
+  display->setCursor(13, DISPLAYPADDINGTOP);
+  display->print(F("Hold LEFT to exit"));
+  display->display();
 
+  destroyDisplay();
+  displayEnabled = false;
+
+  startSerialUSB();
+}
+void startSerialUSB() {
+  uart.begin(9600);
+}
+void endSerialUSB() {
+  uart.end();
+
+  display = new Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+  initDisplay(false);
+  displayEnabled = true;
 }
 // is called when holded action button on settings menu
 void settingsHoldAction() {
@@ -581,7 +639,7 @@ void setStoreTempTimer() {
 // show live temperature on display
 void displayLive() {
   // do not waste cpu if display is isDimmed
-  if (isDimmed) return;
+  if (isDimmed || !displayEnabled) return;
 
   // skip execution until show timer is ready
   if (!forceMenuRedraw && !timerShowTemp.isReady())
@@ -590,27 +648,27 @@ void displayLive() {
   // calc averaged value of temperature
   dtostrf(computeTemp(tempValPartAverage), 6, 2, tempStrBuf);
   
-  display.clearDisplay();
+  display->clearDisplay();
   
   // char size at scale 1 is 5x8. 6 digits and font_scale=3
-  // display.setCursor((SCREEN_WIDTH - 6*5*3) / 2, DISPLAYPADDINGTOP + 6);
-  display.setCursor(0, DISPLAYPADDINGTOP);
-  display.setTextColor(SSD1306_WHITE);  // Draw white text
-  display.setTextSize(3);
-  display.print(tempStrBuf);
+  // display->setCursor((SCREEN_WIDTH - 6*5*3) / 2, DISPLAYPADDINGTOP + 6);
+  display->setCursor(0, DISPLAYPADDINGTOP);
+  display->setTextColor(SSD1306_WHITE);  // Draw white text
+  display->setTextSize(3);
+  display->print(tempStrBuf);
 
-  display.setCursor(display.getCursorX(), display.getCursorY() - 4);
-  display.setTextSize(2);
-  display.print('o');
+  display->setCursor(display->getCursorX(), display->getCursorY() - 4);
+  display->setTextSize(2);
+  display->print('o');
 
   forceMenuRedraw = false;
-  display.display();
+  display->display();
 }
 
 
 // build graph on the display
 void displayGraph() {
-  if (isDimmed) return;
+  if (isDimmed || !displayEnabled) return;
 
   // Serial.println(forceMenuRedraw);
 
@@ -618,31 +676,31 @@ void displayGraph() {
   if (timerShowTemp.isReady() || forceMenuRedraw) {
     // only draw this caption if graphCursor mode is inactive
     if (graphCurs >= MEASDATALENGTH) {
-      display.fillRect(0, 0, SCREEN_WIDTH, DISPLAYPADDINGTOP, SSD1306_BLACK);
+      display->fillRect(0, 0, SCREEN_WIDTH, DISPLAYPADDINGTOP, SSD1306_BLACK);
 
-      display.setCursor(0, 0);
-      display.setTextColor(SSD1306_WHITE);  // Draw white text
-      display.setTextSize(1);
+      display->setCursor(0, 0);
+      display->setTextColor(SSD1306_WHITE);  // Draw white text
+      display->setTextSize(1);
 
       dtostrf(computeTemp(tempValPartAverage), 6, 2, tempStrBuf);
-      display.print(tempStrBuf);
+      display->print(tempStrBuf);
       // do not show min/max until first storage iteration updates its default values
       if (cycled || curs > 0) {
-        display.print(" ");
-        byte curX = display.getCursorX();
-        display.print("l:");
+        display->print(" ");
+        byte curX = display->getCursorX();
+        display->print("l:");
         dtostrf(measMin, 5, 1, tempStrBuf);
-        display.print(tempStrBuf);
-        display.print(" ");
+        display->print(tempStrBuf);
+        display->print(" ");
         dtostrf(measMax, 5, 1, tempStrBuf);
-        display.print(tempStrBuf);
-        display.setCursor(curX, 8);
-        display.print("g:");
+        display->print(tempStrBuf);
+        display->setCursor(curX, 8);
+        display->print("g:");
         dtostrf(measMinG, 5, 1, tempStrBuf);
-        display.print(tempStrBuf);
-        display.print(" ");
+        display->print(tempStrBuf);
+        display->print(" ");
         dtostrf(measMaxG, 5, 1, tempStrBuf);
-        display.print(tempStrBuf);
+        display->print(tempStrBuf);
       }
     }
   }
@@ -651,7 +709,7 @@ void displayGraph() {
   if (measChanged || forceMenuRedraw) {
     // update graph if new data exists or forced by menyJustChanged
     measChanged = false;
-    display.fillRect(0, DISPLAYPADDINGTOP, SCREEN_WIDTH, DISPLAYDATAHEIGHT, SSD1306_BLACK);
+    display->fillRect(0, DISPLAYPADDINGTOP, SCREEN_WIDTH, DISPLAYDATAHEIGHT, SSD1306_BLACK);
 
     // i iterates from 0 to cursor (or from cursor+1 up to cursor, wrapping around the MEASDATALENGTH)
     byte i = cycled ? (curs + 1) : 0;
@@ -662,7 +720,7 @@ void displayGraph() {
       if (i == MEASDATALENGTH) i = 0;  // wrap around i
       if (i == curs) break;  // stop condition
       byte y = SCREEN_HEIGHT - GRAPHPADDINGBOT - (measData[i] - measMin8) * scale;
-      display.drawLine(prevX, prevY, x, y, SSD1306_WHITE);
+      display->drawLine(prevX, prevY, x, y, SSD1306_WHITE);
       prevX = x;
       prevY = y;
     }
@@ -670,32 +728,32 @@ void displayGraph() {
 
   /* === draw cursor === */
   if (graphCurs < MEASDATALENGTH) {
-    display.drawLine(graphCurs, DISPLAYPADDINGTOP, graphCurs, SCREEN_HEIGHT, SSD1306_WHITE);
+    display->drawLine(graphCurs, DISPLAYPADDINGTOP, graphCurs, SCREEN_HEIGHT, SSD1306_WHITE);
     
     
-    display.fillRect(0, 0, SCREEN_WIDTH, DISPLAYPADDINGTOP, SSD1306_BLACK);
+    display->fillRect(0, 0, SCREEN_WIDTH, DISPLAYPADDINGTOP, SSD1306_BLACK);
     // draw current X position as -time
     int16_t curBackTime = (cycled ? MEASDATALENGTH : (curs + 1)) - graphCurs;
     if (curBackTime > 0) {
-      display.setCursor(0, 0);
-      display.setTextColor(SSD1306_WHITE);  // Draw white text
-      display.setTextSize(1);
+      display->setCursor(0, 0);
+      display->setTextColor(SSD1306_WHITE);  // Draw white text
+      display->setTextSize(1);
 
       formatBackTime(curBackTime * timerStoreTemp.getInterval(), tempStrBuf, 1);
-      if (curBackTime > 0) display.print('-');
-      display.print(tempStrBuf[1]);
-      display.print(tempStrBuf[2]);
-      display.print(tempStrBuf[3]);
-      display.print(tempStrBuf[4]);
+      if (curBackTime > 0) display->print('-');
+      display->print(tempStrBuf[1]);
+      display->print(tempStrBuf[2]);
+      display->print(tempStrBuf[3]);
+      display->print(tempStrBuf[4]);
       
-      display.setCursor(display.getCursorX() + 8, 0);
+      display->setCursor(display->getCursorX() + 8, 0);
       dtostrf(measData[cycled ? ((curs + graphCurs) % MEASDATALENGTH) : (graphCurs - 1)], 6, 2, tempStrBuf);
-      display.print(tempStrBuf);
+      display->print(tempStrBuf);
     }
   }
 
   forceMenuRedraw = false;
-  display.display();
+  display->display();
 }
 void graphCursorMove(const int8_t dir) {
   if ((int8_t)graphCurs + dir < 0)
@@ -708,11 +766,11 @@ void graphCursorMove(const int8_t dir) {
 
 // show settings screen
 void displaySettings() {
-  if (isDimmed) return;
+  if (isDimmed || !displayEnabled) return;
 
   if (forceMenuRedraw) {
-    display.clearDisplay();
-    display.setTextSize(1);
+    display->clearDisplay();
+    display->setTextSize(1);
 
     // dimming & graph timeout
     displaySettingsEntry(SETTINGSDIMMING, PGM_READ_CHARARR(settingsNames[0]), PGM_READ_CHARARR(settingsOptsDimming[settingsOptsDimmingCur]));
@@ -724,63 +782,63 @@ void displaySettings() {
 
     // clear data
     displaySettingsButton(SETTINGSRESET, SLULEFTPADDING, SLUY, 5, PGM_READ_CHARARR(settingsNames[2]));
-    displaySettingsButton(SETTINGSSAVE, display.getCursorX() + 3, SLUY, 4, PGM_READ_CHARARR(settingsNames[3]));
-    displaySettingsButton(SETTINGSLOAD, display.getCursorX() + 3, SLUY, 4, PGM_READ_CHARARR(settingsNames[4]));
-    displaySettingsButton(SETTINGSUSB, display.getCursorX() + 3, SLUY, 3, PGM_READ_CHARARR(settingsNames[5]));
+    displaySettingsButton(SETTINGSSAVE, display->getCursorX() + 3, SLUY, 4, PGM_READ_CHARARR(settingsNames[3]));
+    displaySettingsButton(SETTINGSLOAD, display->getCursorX() + 3, SLUY, 4, PGM_READ_CHARARR(settingsNames[4]));
+    displaySettingsButton(SETTINGSUSB, display->getCursorX() + 3, SLUY, 3, PGM_READ_CHARARR(settingsNames[5]));
 
 
     // settings description
     // graph timeout setting
     if (settingSelected == SETTINGSGRAPHTIMEOUT) {
-      display.setCursor(4, 4);
-      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+      display->setCursor(4, 4);
+      display->setTextColor(SSD1306_WHITE, SSD1306_BLACK);
 
-      display.print(F("Max storage: "));
+      display->print(F("Max storage: "));
       formatBackTime(MEASDATALENGTH * getStoreTempTimerInterval(settingsOptsGraphCur), tempStrBuf, 0);
       // Serial.print(tempStrBuf);
       // Serial.print(" <- ");
       // Serial.println(MEASDATALENGTH * getStoreTempTimerInterval(settingsOptsGraphCur));
-      display.print(tempStrBuf[0]);
-      display.print(tempStrBuf[1]);
-      display.print(tempStrBuf[2]);
-      display.print(tempStrBuf[3]);
+      display->print(tempStrBuf[0]);
+      display->print(tempStrBuf[1]);
+      display->print(tempStrBuf[2]);
+      display->print(tempStrBuf[3]);
     }
     
-    display.display();
+    display->display();
   }
   forceMenuRedraw = false;
 }
 // draws each entry in settings
 void displaySettingsEntry(const byte row, const char* name, const char* val) {
-    display.setCursor(0, (DISPLAYPADDINGTOP+2) + 12*row);
-    display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
-    display.print(name);
-    display.print(" ");
+    display->setCursor(0, (DISPLAYPADDINGTOP+2) + 12*row);
+    display->setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    display->print(name);
+    display->print(" ");
     if (settingIsChanging && settingSelected == row) {
-      display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-      display.drawRect(display.getCursorX()-1, display.getCursorY()-1, 4*6+2, 10, SSD1306_WHITE);
-      display.drawRect(display.getCursorX()-2, display.getCursorY()-2, 4*6+4, 12, SSD1306_WHITE);
+      display->setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+      display->drawRect(display->getCursorX()-1, display->getCursorY()-1, 4*6+2, 10, SSD1306_WHITE);
+      display->drawRect(display->getCursorX()-2, display->getCursorY()-2, 4*6+4, 12, SSD1306_WHITE);
     } else {
-      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+      display->setTextColor(SSD1306_WHITE, SSD1306_BLACK);
     }
-    display.print(val);
+    display->print(val);
     // draw box around whole entry
-    display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+    display->setTextColor(SSD1306_WHITE, SSD1306_BLACK);
     if (!settingIsChanging && settingSelected == row) {
-      display.drawRect(0, display.getCursorY()-2, SCREEN_WIDTH, 12, SSD1306_WHITE);
+      display->drawRect(0, display->getCursorY()-2, SCREEN_WIDTH, 12, SSD1306_WHITE);
     }
 }
 // draws button in settings
 void displaySettingsButton(const byte ind, const byte x, const byte y, const byte l, const char* val) {
-    display.setCursor(x + 2, y + 2);
+    display->setCursor(x + 2, y + 2);
     if (settingSelected == ind && !settingIsChanging) {  // == row
-      display.setTextColor(SSD1306_WHITE, SSD1306_BLACK);
+      display->setTextColor(SSD1306_WHITE, SSD1306_BLACK);
     } else {
-      display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-      display.drawRect(display.getCursorX()-1, display.getCursorY()-1, l*6+2, 10, SSD1306_WHITE);
+      display->setTextColor(SSD1306_BLACK, SSD1306_WHITE);
+      display->drawRect(display->getCursorX()-1, display->getCursorY()-1, l*6+2, 10, SSD1306_WHITE);
     }
-    display.drawRect(display.getCursorX()-2, display.getCursorY()-2, l*6+4, 12, SSD1306_WHITE);
-    display.print(val);
+    display->drawRect(display->getCursorX()-2, display->getCursorY()-2, l*6+4, 12, SSD1306_WHITE);
+    display->print(val);
 }
 
 void measurePartial() {

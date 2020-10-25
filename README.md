@@ -58,6 +58,7 @@ Hold RIGHT button to exit SETTINGS screen.
 
 ## Known bugs
 
+- Settings are not saved/loaded with [Save]/[Load]
 - Time estimations r not accurate (should be rounded instead of flooring)
 - No time memory (only considers current graph timeout setting, even if the whole graph has been built with different graph timeout)
 - Low memory
