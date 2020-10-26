@@ -321,17 +321,21 @@ void loop() {
   if (!displayEnabled) {
     if (uart.available()) {
       byte cmd = uart.read();
-      if (cmd == USBCMD_SERVICE) {
-        uart.print(settingsOptsGraphCur);
-      } else {
-        uart.print(F("HEY!"));
+      // send eeprom cursor and data length
+      if (cmd == USBCMD_SENDDATA) {
+        uart.print(timerStoreTemp.getInterval());
+        uart.print(' ');
+        uint8_t i = cycled ? curs : 0;  // uint16_t for MEGA
+        for (;;) {
+          uart.print(measData[i++]);
+          if (i == MEASDATALENGTH) i = 0;  // wrap around i
+          if (i == curs) break;  // stop condition
+          uart.print(',');
+        }
+        uart.print('\r');
+        uart.print('\n');
       }
     }
-    // if (bts > 0) {
-    //   for (uint8_t i = 0; i < bts; i++)
-    //     uart.print((byte)uart.read());
-    //     uart.print(' ');
-    // }
   }
 }
 
@@ -486,10 +490,13 @@ void onButtonSave() {
   // <------ minTemp ------>  resolution
 
   // get cursor & length of last saving iteration
-  uint32_t indLenMin;
-  EEPROM.get(0, indLenMin);
-  uint16_t indOfStart = indLenMin >> 20;
-  uint16_t dataLength = (indLenMin >> 8) & 0xFFF;
+  // uint32_t indLenMin;
+  // EEPROM.get(0, indLenMin);
+  // uint16_t indOfStart = indLenMin >> 20;
+  // uint16_t dataLength = (indLenMin >> 8) & 0xFFF;
+  uint16_t indOfStart;
+  uint16_t dataLength;
+  eepromGetIndLen(indOfStart, dataLength);
   // validate and "constrain"
   // first 5 bytes and last 2 bytes are reserved as service storage
   if (indOfStart < 5 || indOfStart >= EEPROM.length() - 2) indOfStart = 5;
@@ -500,7 +507,7 @@ void onButtonSave() {
   if (startShift >= EEPROM.length() - 2) startShift = 5;
 
   // put measured data to eeprom byte-by-byte
-  uint8_t i = cycled ? (curs + 1) : 0;  // uint16_t for MEGA
+  uint8_t i = cycled ? curs : 0;  // uint16_t for MEGA
   uint8_t shift = 0;  // uint16_t for MEGA
   for (;; i++, shift++) {
     if (i == MEASDATALENGTH) i = 0;  // wrap around i
@@ -509,17 +516,21 @@ void onButtonSave() {
   }
 
   // update cursor & length
-  indLenMin = (startShift << 12 | (shift & 0x0FFF)) << 8;
+  uint32_t indLenMin = (startShift << 12 | (shift & 0x0FFF)) << 8;
   EEPROM.put(0, indLenMin);
   EEPROM.put(4, 0);  // this is a placeholder for now
 }
 // load data from eeprom
 void onButtonLoad() {
   // check the scheme in onButtonSave method
-  uint32_t indLenMin;
-  EEPROM.get(0, indLenMin);
-  uint16_t indOfStart = indLenMin >> 20;
-  uint16_t dataLength = (indLenMin >> 8) & 0xFFF;
+  // uint32_t indLenMin;
+  // EEPROM.get(0, indLenMin);
+  // uint16_t indOfStart = indLenMin >> 20;
+  // uint16_t dataLength = (indLenMin >> 8) & 0xFFF;
+  uint16_t indOfStart;
+  uint16_t dataLength;
+  eepromGetIndLen(indOfStart, dataLength);
+
   if (indOfStart < 5 || indOfStart >= EEPROM.length() - 2) indOfStart = 5;
   uint16_t dataLengthMax = min(EEPROM.length() - 2 - 5, MEASDATALENGTH);
   if (dataLength > dataLengthMax) dataLength = dataLengthMax;
@@ -554,6 +565,13 @@ void onButtonLoad() {
   tempValPartAverage = 0;
   tempValN = 0;
   measurePartial();
+}
+// reads eepromCursor and dataLength from eeprom
+void eepromGetIndLen(uint16_t &ind, uint16_t &len) {
+  uint32_t indLenMin;
+  EEPROM.get(0, indLenMin);
+  ind = indLenMin >> 20;
+  len = (indLenMin >> 8) & 0xFFF;
 }
 // turn USB synchronization mode on
 void onButtonUSB() {

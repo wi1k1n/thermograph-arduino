@@ -69,6 +69,13 @@ void formatBackTime(uint32_t ms, char* tempStrBuf, byte startInd) {
   }
 }
 
+void uint32ToBytes(const uint32_t &val, uint8_t* b) {
+    b[0] = (byte)(val >> 24);
+    b[1] = (byte)((val >> 16) & 0xff);
+    b[2] = (byte)((val >> 8) & 0xff);
+    b[3] = (byte)(val & 0xff);
+}
+
 #ifdef __arm__
 // should use uinstd.h to define sbrk but Due causes a conflict
 extern "C" char* sbrk(int incr);

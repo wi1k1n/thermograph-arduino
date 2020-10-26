@@ -53,9 +53,8 @@
 #define SETTINGSUSB             5
 
 // USB
-#define USBCMD_SERVICE      0x01
-#define USBCMD_SENDDATA     0x02
-#define USBCMD_SENDUPD      0x03
+#define USBCMD_SENDDATA     0x09
+#define USBCMD_SENDUPD      0x0F
 
 
 // Steinhart–Hart equation (for thermistor) constants
