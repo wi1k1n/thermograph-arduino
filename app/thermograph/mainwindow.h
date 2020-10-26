@@ -6,8 +6,12 @@
 #include <QLabel>
 
 #define CMDSTATE_NONE       0
-#define CMDSTATE_SERVICE    1
+#define CMDSTATE_EEPROM     1
 #define CMDSTATE_DATA       2
+
+#define USBCMD_SENDDATA     0x09
+#define USBCMD_SENDEEPROM   0x0F
+#define USBCMD_SENDLIVE     0x12
 
 namespace Ui {
 class MainWindow;
@@ -28,6 +32,7 @@ private slots:
     void onClosePortClicked();
 
     void on_btnGetData_clicked(const bool checked);
+    void on_btnGetEEPROM_clicked(const bool checked);
 
     void handleError(const QSerialPort::SerialPortError);
     void serialReadyRead();

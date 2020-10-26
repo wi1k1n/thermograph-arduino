@@ -7,10 +7,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
-#define USBCMD_SERVICE      0x08
-#define USBCMD_SENDDATA     0x09
-#define USBCMD_SENDUPD      0x0F
-
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
@@ -123,6 +119,10 @@ void MainWindow::serialReadyRead() {
             qDebug() << serialData.left(serialData.length() - 2);
             ui->plainTextEdit->document()->setPlainText(serialData.left(serialData.length() - 2).replace(',', '\n').replace(" ", "\n\n"));
             serialCmdState = CMDSTATE_NONE;
+        } else if (serialCmdState == CMDSTATE_EEPROM) {
+            qDebug() << serialData.left(serialData.length() - 2);
+            ui->plainTextEdit->document()->setPlainText(serialData.left(serialData.length() - 2).replace(',', '\n').replace(" ", "\n\n"));
+            serialCmdState = CMDSTATE_NONE;
         }
     }
 }
@@ -130,5 +130,11 @@ void MainWindow::serialReadyRead() {
 void MainWindow::on_btnGetData_clicked(const bool checked) {
     serial->write(QByteArray(1, USBCMD_SENDDATA));
     serialCmdState = CMDSTATE_DATA;
+    serialData = "";
+}
+
+void MainWindow::on_btnGetEEPROM_clicked(const bool checked) {
+    serial->write(QByteArray(1, USBCMD_SENDEEPROM));
+    serialCmdState = CMDSTATE_EEPROM;
     serialData = "";
 }

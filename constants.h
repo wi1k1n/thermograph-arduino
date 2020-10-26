@@ -8,6 +8,8 @@
 //#define EEPROMMEASMIN 0  // [-128 .. 127-EEPROMMEASRANGE] - minimum measured temperature
 //#define EEPROMDATALASTIND 1015  // do not change!
 //#define EEPROMLENGTH EEPROM.length()
+#define EEPROMDATASTARTINDEX 5
+#define EEPROMDATAENDINDEX EEPROM.length() - 2
 
 // Hardware constants
 #define THERMISTORPIN 0  // analog input pin for thermistor
@@ -53,8 +55,9 @@
 #define SETTINGSUSB             5
 
 // USB
-#define USBCMD_SENDDATA     0x09
-#define USBCMD_SENDUPD      0x0F
+#define USBCMD_SENDDATA         0x09
+#define USBCMD_SENDEEPROM       0x0F
+#define USBCMD_SENDLIVE         0x12
 
 
 // Steinhart–Hart equation (for thermistor) constants

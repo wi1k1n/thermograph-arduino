@@ -321,7 +321,7 @@ void loop() {
   if (!displayEnabled) {
     if (uart.available()) {
       byte cmd = uart.read();
-      // send eeprom cursor and data length
+      // send data from meas[]
       if (cmd == USBCMD_SENDDATA) {
         uart.print(timerStoreTemp.getInterval());
         uart.print(' ');
@@ -334,6 +334,36 @@ void loop() {
         }
         uart.print('\r');
         uart.print('\n');
+      }
+      // send content of eeprom
+      else if (cmd == USBCMD_SENDEEPROM) {
+        uint16_t indOfStart;
+        uint16_t dataLength;
+        eepromGetIndLen(indOfStart, dataLength);
+        if (indOfStart < EEPROMDATASTARTINDEX || indOfStart >= EEPROMDATAENDINDEX)
+          indOfStart = EEPROMDATASTARTINDEX;
+        if (dataLength > EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX)
+          dataLength = EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX;
+        
+        uart.print(timerStoreTemp.getInterval());
+        uart.print(' ');
+        uint16_t indLast = indOfStart + dataLength - 1;
+        if (indLast >= EEPROMDATAENDINDEX)
+          indLast -= EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX;
+        for (;; ++indOfStart) {
+          uint8_t d;
+          EEPROM.get(indOfStart, d);
+          uart.print(d);
+          if (indOfStart == EEPROMDATAENDINDEX) indOfStart = EEPROMDATASTARTINDEX;  // wrap around i
+          if (indOfStart == indLast) break;  // stop condition
+          uart.print(',');
+        }
+        uart.print('\r');
+        uart.print('\n');
+      }
+      // send updates
+      else if (cmd == USBCMD_SENDLIVE) {
+
       }
     }
   }
@@ -499,12 +529,15 @@ void onButtonSave() {
   eepromGetIndLen(indOfStart, dataLength);
   // validate and "constrain"
   // first 5 bytes and last 2 bytes are reserved as service storage
-  if (indOfStart < 5 || indOfStart >= EEPROM.length() - 2) indOfStart = 5;
-  if (dataLength > EEPROM.length() - 2 - 5) dataLength = EEPROM.length() - 2 - 5;
+  if (indOfStart < EEPROMDATASTARTINDEX || indOfStart >= EEPROMDATAENDINDEX)
+    indOfStart = EEPROMDATASTARTINDEX;
+  if (dataLength > EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX)
+    dataLength = EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX;
   
   // calculate start index for current saving (for reducing eeprom wear)
   uint32_t startShift = indOfStart + dataLength;
-  if (startShift >= EEPROM.length() - 2) startShift = 5;
+  if (startShift >= EEPROMDATAENDINDEX)
+    startShift = EEPROMDATASTARTINDEX;
 
   // put measured data to eeprom byte-by-byte
   uint8_t i = cycled ? curs : 0;  // uint16_t for MEGA
@@ -531,14 +564,15 @@ void onButtonLoad() {
   uint16_t dataLength;
   eepromGetIndLen(indOfStart, dataLength);
 
-  if (indOfStart < 5 || indOfStart >= EEPROM.length() - 2) indOfStart = 5;
-  uint16_t dataLengthMax = min(EEPROM.length() - 2 - 5, MEASDATALENGTH);
-  if (dataLength > dataLengthMax) dataLength = dataLengthMax;
-  // if (dataLength > EEPROM.length() - 2 - 5) dataLength = EEPROM.length() - 2 - 5;
+  if (indOfStart < EEPROMDATASTARTINDEX || indOfStart >= EEPROMDATAENDINDEX)
+    indOfStart = EEPROMDATASTARTINDEX;
+  uint16_t dataLengthMax = min(EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX, MEASDATALENGTH);
+  if (dataLength > dataLengthMax)
+    dataLength = dataLengthMax;
 
   // load measurements byte-by-byte
   for (uint8_t i = 0; i < dataLength; i++, indOfStart++) {  // uint16_t for MEGA
-    if (indOfStart >= EEPROM.length() - 2) indOfStart = 5;
+    if (indOfStart >= EEPROMDATAENDINDEX) indOfStart = EEPROMDATAENDINDEX;
     EEPROM.get(indOfStart, measData[i]);
   }
   cycled = dataLength >= MEASDATALENGTH;
