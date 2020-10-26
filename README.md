@@ -58,12 +58,7 @@ Hold RIGHT button to exit SETTINGS screen.
 
 ## Known bugs
 
-- Settings are not saved/loaded with [Save]/[Load]
+- Test [Save]/[Load] and USB-mode for storing/loading/sending all needed data (e.g. 128/128 measurements)
 - Time estimations r not accurate (should be rounded instead of flooring)
 - No time memory (only considers current graph timeout setting, even if the whole graph has been built with different graph timeout)
 - Low memory
-
-### FIXED:
-+ After [Load] the range is wrong
-+ On [Save] theres high eeprom wear (need to consequently slide cursor)
-## 

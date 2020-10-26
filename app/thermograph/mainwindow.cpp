@@ -28,7 +28,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(serial, &QSerialPort::readyRead, this, &MainWindow::serialReadyRead);
     connect(serial, &QSerialPort::errorOccurred, this, &MainWindow::handleError);
 
-    qDebug() << "Hello from constructor!";
+    reloadPorts();
 }
 
 MainWindow::~MainWindow()
@@ -37,13 +37,24 @@ MainWindow::~MainWindow()
 }
 
 void MainWindow::on_actionAbout_triggered() {
-    qDebug() << "Hello About!";
+    QMessageBox::about(this, tr("Thermograph App"), tr("This is an app for thermograph project. Find more on https://github.com/wi1k1n/thermograph-arduino"));
 }
 
 void MainWindow::on_menuConnect_aboutToShow() {
-//    qDebug() << "Hello from menuPort!";
+    reloadPorts();
+}
+void MainWindow::reloadPorts() {
+    // get list of available ports
     const QList<QSerialPortInfo> portList = QSerialPortInfo::availablePorts();
 
+    // show warning if on COM ports detected
+    if (portList.length() == 0) {
+        QMessageBox::warning(this, tr("No thermograph detected!"), tr("Please check if you have connected thermograph to your PC!"));
+        ui->menuConnect->clear();
+        return;
+    }
+
+    // compose qmenu if there are some
     ui->menuConnect->clear();
     for (auto iter = portList.begin(); iter != portList.end(); ++iter) {
         QAction *qa = new QAction(iter->portName());
@@ -56,50 +67,58 @@ void MainWindow::on_menuConnect_aboutToShow() {
     qaSeparator->setSeparator(true);
     ui->menuConnect->addAction(qaSeparator);
 
-    QAction *qaClosePort = new QAction("Close port");
+    QAction *qaClosePort = new QAction(tr("Close port"));
     connect(qaClosePort, &QAction::triggered, this, &MainWindow::onClosePortClicked);
     ui->menuConnect->addAction(qaClosePort);
+
+    // try to connect if there is only one available port
+    if (portList.length() == 1) {
+        openSerial(portList.first().portName());
+    }
 }
 
 void MainWindow::onPortClicked(QAction* act) {
-    qDebug() << act->text();
+//    qDebug() << act->text();
     if (act->text() == serial->portName()) {
         if (serial->isOpen()) {
             qDebug() << "Port: " << serial->portName() << " is already opened!";
             return;
         }
-    } else {
-        serial->setPortName(act->text());
     }
-
-    if (serial->open(QIODevice::ReadWrite)) {
-        qDebug() << "Successfully opened port: " << serial->portName();
-        lblStatus->setText(QString("Connected: %1").arg(act->text()));
-        foreach (QAction *action, ui->menuConnect->actions()) {
-            action->setText(QString("%11").arg(action->text()));
-        }
-
-    } else
-        qDebug() << "Error opening port: " << serial->portName();
-
+    openSerial(act->text());
 }
 void MainWindow::onClosePortClicked() {
     qDebug() << "Close port!";
+    closeSerial();
+}
+
+void MainWindow::openSerial(const QString &portName) {
+    if (serial->portName() != portName)
+        serial->setPortName(portName);
+
+    if (serial->open(QIODevice::ReadWrite)) {
+        qDebug() << "Successfully opened port: " << serial->portName();
+        lblStatus->setText(QString(tr("Connected: %1")).arg(serial->portName()));
+    } else {
+        qDebug() << "Error opening port: " << serial->portName();
+    }
+}
+void MainWindow::closeSerial() {
     if (serial->isOpen())
         serial->close();
-    lblStatus->setText("Disconnected");
+    lblStatus->setText(tr("Disconnected"));
 }
 
 void MainWindow::handleError(const QSerialPort::SerialPortError err) {
     QString errMsg;
     switch (err) {
         case QSerialPort::NoError: return;
-        case QSerialPort::DeviceNotFoundError: errMsg = "Attempted to open non-existing device."; break;
-        case QSerialPort::PermissionError: errMsg = "Can't open device. Access denied."; break;
-        case QSerialPort::OpenError: errMsg = "Error while opening device."; break;
-        case QSerialPort::WriteError: errMsg = "Error occured while writing the data."; break;
-        case QSerialPort::ReadError: errMsg = "Error occured while reading the data."; break;
-        case QSerialPort::ResourceError: errMsg = "Device became unavailable (disconnected?)"; break;
+        case QSerialPort::DeviceNotFoundError: errMsg = tr("Attempted to open non-existing device."); break;
+        case QSerialPort::PermissionError: errMsg = tr("Can't open device. Access denied."); break;
+        case QSerialPort::OpenError: errMsg = tr("Error while opening device."); break;
+        case QSerialPort::WriteError: errMsg = tr("Error occured while writing the data."); break;
+        case QSerialPort::ReadError: errMsg = tr("Error occured while reading the data."); break;
+        case QSerialPort::ResourceError: errMsg = tr("Device became unavailable (disconnected?)"); break;
         default: errMsg = "Unknown error."; break;
     }
     QMessageBox::critical(this, tr("Critical Error"), QString("%1\n%2").arg(errMsg, serial->errorString()));
@@ -115,26 +134,49 @@ void MainWindow::serialReadyRead() {
     serialData.append(data);
 
     if (serialData.right(2) == "\r\n") {
+        qDebug() << serialData.left(serialData.length() - 2);
         if (serialCmdState == CMDSTATE_DATA) {
-            qDebug() << serialData.left(serialData.length() - 2);
             ui->plainTextEdit->document()->setPlainText(serialData.left(serialData.length() - 2).replace(',', '\n').replace(" ", "\n\n"));
             serialCmdState = CMDSTATE_NONE;
         } else if (serialCmdState == CMDSTATE_EEPROM) {
-            qDebug() << serialData.left(serialData.length() - 2);
             ui->plainTextEdit->document()->setPlainText(serialData.left(serialData.length() - 2).replace(',', '\n').replace(" ", "\n\n"));
             serialCmdState = CMDSTATE_NONE;
+        } else if (serialCmdState == CMDSTATE_LIVE) {
+            ui->plainTextEdit->moveCursor (QTextCursor::End);
+            ui->plainTextEdit->insertPlainText(serialData);
+            serialData = "";
         }
     }
 }
 
-void MainWindow::on_btnGetData_clicked(const bool checked) {
+void MainWindow::on_btnGetData_clicked(const bool) {
+    stopLive();
     serial->write(QByteArray(1, USBCMD_SENDDATA));
     serialCmdState = CMDSTATE_DATA;
     serialData = "";
 }
 
-void MainWindow::on_btnGetEEPROM_clicked(const bool checked) {
+void MainWindow::on_btnGetEEPROM_clicked(const bool) {
+    stopLive();
     serial->write(QByteArray(1, USBCMD_SENDEEPROM));
     serialCmdState = CMDSTATE_EEPROM;
     serialData = "";
+}
+
+void MainWindow::on_btnLive_clicked(const bool) {
+    ui->btnLive->setChecked(ui->btnLive->isChecked());
+    if (ui->btnLive->isChecked()) {
+        serial->write(QByteArray(1, USBCMD_SENDLIVESTART));
+        serialCmdState = CMDSTATE_LIVE;
+        serialData = "";
+        ui->plainTextEdit->document()->setPlainText("");
+    }
+    // if turning live off
+    else stopLive();
+}
+
+void MainWindow::stopLive() {
+    serial->write(QByteArray(1, USBCMD_SENDLIVESTOP));
+    serialCmdState = CMDSTATE_NONE;
+    ui->btnLive->setChecked(false);
 }

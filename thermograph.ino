@@ -11,7 +11,6 @@
 #define PGM_READ_CHARARR(val) (char*)pgm_read_word(&val)
 
 Adafruit_SSD1306* display = new Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-boolean displayEnabled = true;
 
 GButton btnL(BTNLEFT_PIN, LOW_PULL);
 GButton btnR(BTNRIGHT_PIN, LOW_PULL);
@@ -45,7 +44,7 @@ float scale = 2.f;
 
 // Menu variables
 byte menuScreen = MENUGRAPH;  // 0 - live temp, 1 - graph, 2 - settings
-byte menuScreenLast = menuScreen;  // restore correct after settings
+byte menuScreenLast = menuScreen;  // restore correct screen after settings
 bool forceMenuRedraw = true;  // can be set to force display methods to redraw. (display methods unset this flag!)
 byte settingSelected = SETTINGSDIMMING;
 byte settingIsChanging = false;
@@ -65,6 +64,10 @@ byte settingsOptsGraphCur = 1;
 // graphCurs > MEASDATALENGTH  ==>  graphCurs is not active
 byte graphCurs = 255;
 byte graphCursSteps = 0;
+
+// usb-mode
+boolean displayEnabled = true;
+boolean updateMeasurementUSB = false;
 
 
 void setup() {
@@ -103,7 +106,10 @@ void loop() {
   // store averaged value in array
   if (timerStoreTemp.isReady()) {
     // Serial.println(F("store timer ready"));
-    storeMeasurement();    
+    storeMeasurement();
+    if (updateMeasurementUSB) {
+      uart.println(computeTemp(tempValPartAverage));
+    }
   }
 
   if (btnL.isPress()) {
@@ -361,9 +367,13 @@ void loop() {
         uart.print('\r');
         uart.print('\n');
       }
-      // send updates
-      else if (cmd == USBCMD_SENDLIVE) {
-
+      // start sending updates
+      else if (cmd == USBCMD_SENDLIVESTART) {
+        updateMeasurementUSB = true;
+      }
+      // stop sending updates
+      else if (cmd == USBCMD_SENDLIVESTOP) {
+        updateMeasurementUSB = false;
       }
     }
   }
@@ -624,6 +634,7 @@ void startSerialUSB() {
   uart.begin(9600);
 }
 void endSerialUSB() {
+  updateMeasurementUSB = false;
   uart.end();
 
   display = new Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);

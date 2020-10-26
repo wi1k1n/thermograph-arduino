@@ -57,7 +57,8 @@
 // USB
 #define USBCMD_SENDDATA         0x09
 #define USBCMD_SENDEEPROM       0x0F
-#define USBCMD_SENDLIVE         0x12
+#define USBCMD_SENDLIVESTART    0x12
+#define USBCMD_SENDLIVESTOP     0x13
 
 
 // Steinhart–Hart equation (for thermistor) constants
