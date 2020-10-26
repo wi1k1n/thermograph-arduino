@@ -10,10 +10,15 @@
 #define CMDSTATE_DATA       2
 #define CMDSTATE_LIVE       3
 
+#define USBCMD_PING             0x02
 #define USBCMD_SENDDATA         0x09
 #define USBCMD_SENDEEPROM       0x0F
 #define USBCMD_SENDLIVESTART    0x12
 #define USBCMD_SENDLIVESTOP     0x13
+
+#define USBSTATUS_BEGIN     "begin"
+#define USBSTATUS_PONG      "pong"
+#define USBSTATUS_END       "end"
 
 namespace Ui {
 class MainWindow;
@@ -43,12 +48,13 @@ private slots:
 private:
     Ui::MainWindow *ui = nullptr;
     QSerialPort *serial = nullptr;
-    QLabel *lblStatus = nullptr;
+    QLabel *lblStatusPort = nullptr;
+    QLabel *lblStatusTherm = nullptr;
 
     uint8_t serialCmdState = CMDSTATE_NONE;
     QString serialData;
 
-    void reloadPorts();
+    void reloadPorts(const bool autoConnect = false);
     void openSerial(const QString &portName);
     void closeSerial();
     void stopLive();

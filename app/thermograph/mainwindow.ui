@@ -7,17 +7,29 @@
     <x>0</x>
     <y>0</y>
     <width>260</width>
-    <height>474</height>
+    <height>472</height>
    </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
   </property>
   <property name="minimumSize">
    <size>
-    <width>200</width>
-    <height>100</height>
+    <width>260</width>
+    <height>472</height>
+   </size>
+  </property>
+  <property name="maximumSize">
+   <size>
+    <width>260</width>
+    <height>472</height>
    </size>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>Thermograph App</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QPushButton" name="btnGetData">

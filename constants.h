@@ -1,7 +1,7 @@
 // Main constants
 #define TEMPAVERAGEN 20  // [0..255] - number of intermediate measurements
 // #define PSEUDOFLOATPRECISION 10
-#define MEASDATALENGTH 100  // bigger than min(SCREEN_WIDTH, 254) is not supported yet!
+#define MEASDATALENGTH 80  // bigger than min(SCREEN_WIDTH, 254) is not supported yet!
 
 //#define EEPROMMEASBITS 5  // [1..8] - how many bits to use for each measurement when storing in EEPROM
 //#define EEPROMMEASRANGE 32  // [2^EEPROMMEASBITS .. 256] - what range of temperatures (in degrees of celsium) each measurement covers
@@ -55,10 +55,15 @@
 #define SETTINGSUSB             5
 
 // USB
+#define USBCMD_PING             0x02
 #define USBCMD_SENDDATA         0x09
 #define USBCMD_SENDEEPROM       0x0F
 #define USBCMD_SENDLIVESTART    0x12
 #define USBCMD_SENDLIVESTOP     0x13
+
+#define USBSTATUS_BEGIN         F("begin")
+#define USBSTATUS_END           F("end")
+#define USBSTATUS_PONG          F("pong")
 
 
 // Steinhart–Hart equation (for thermistor) constants

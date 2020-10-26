@@ -3,6 +3,7 @@
 #include <QSerialPort>
 #include <QMessageBox>
 #include <QLabel>
+#include <QLayout>
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
@@ -11,24 +12,24 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
     serial(new QSerialPort(this)),
-    lblStatus(new QLabel)
+    lblStatusPort(new QLabel),
+    lblStatusTherm(new QLabel)
 {
     ui->setupUi(this);
-    ui->statusBar->addWidget(lblStatus);
-    lblStatus->setText("Disconnected");
 
-    serial->setBaudRate(QSerialPort::Baud9600);
-    serial->setDataBits(QSerialPort::Data8);
-    serial->setParity(QSerialPort::NoParity);
-    serial->setStopBits(QSerialPort::OneStop);
-    serial->setFlowControl(QSerialPort::NoFlowControl);
+    ui->statusBar->addWidget(lblStatusPort);
+    ui->statusBar->addWidget(lblStatusTherm);
+    ui->statusBar->setSizeGripEnabled(false);
+
+    lblStatusPort->setText("Closed");
+    lblStatusTherm->setText("Disconnected");
 
     connect(ui->actionExit, &QAction::triggered, qApp, QApplication::quit);
 
     connect(serial, &QSerialPort::readyRead, this, &MainWindow::serialReadyRead);
     connect(serial, &QSerialPort::errorOccurred, this, &MainWindow::handleError);
 
-    reloadPorts();
+    reloadPorts(true);
 }
 
 MainWindow::~MainWindow()
@@ -43,7 +44,7 @@ void MainWindow::on_actionAbout_triggered() {
 void MainWindow::on_menuConnect_aboutToShow() {
     reloadPorts();
 }
-void MainWindow::reloadPorts() {
+void MainWindow::reloadPorts(const bool autoConnect) {
     // get list of available ports
     const QList<QSerialPortInfo> portList = QSerialPortInfo::availablePorts();
 
@@ -72,7 +73,7 @@ void MainWindow::reloadPorts() {
     ui->menuConnect->addAction(qaClosePort);
 
     // try to connect if there is only one available port
-    if (portList.length() == 1) {
+    if (autoConnect && portList.length() == 1) {
         openSerial(portList.first().portName());
     }
 }
@@ -96,9 +97,16 @@ void MainWindow::openSerial(const QString &portName) {
     if (serial->portName() != portName)
         serial->setPortName(portName);
 
+    serial->setBaudRate(QSerialPort::Baud9600);
+    serial->setDataBits(QSerialPort::Data8);
+    serial->setParity(QSerialPort::NoParity);
+    serial->setStopBits(QSerialPort::OneStop);
+    serial->setFlowControl(QSerialPort::NoFlowControl);
+
     if (serial->open(QIODevice::ReadWrite)) {
         qDebug() << "Successfully opened port: " << serial->portName();
-        lblStatus->setText(QString(tr("Connected: %1")).arg(serial->portName()));
+        lblStatusPort->setText(QString(tr("Opened: %1")).arg(serial->portName()));
+        serial->write(QByteArray(1, USBCMD_PING));
     } else {
         qDebug() << "Error opening port: " << serial->portName();
     }
@@ -106,7 +114,8 @@ void MainWindow::openSerial(const QString &portName) {
 void MainWindow::closeSerial() {
     if (serial->isOpen())
         serial->close();
-    lblStatus->setText(tr("Disconnected"));
+    lblStatusPort->setText(tr("Closed"));
+    lblStatusTherm->setText(tr("Disconnected"));
 }
 
 void MainWindow::handleError(const QSerialPort::SerialPortError err) {
@@ -124,7 +133,8 @@ void MainWindow::handleError(const QSerialPort::SerialPortError err) {
     QMessageBox::critical(this, tr("Critical Error"), QString("%1\n%2").arg(errMsg, serial->errorString()));
     if (serial->isOpen())
         serial->close();
-    lblStatus->setText("Disconnected");
+    lblStatusPort->setText(tr("Closed"));
+    lblStatusTherm->setText("Disconnected");
 }
 
 void MainWindow::serialReadyRead() {
@@ -133,19 +143,29 @@ void MainWindow::serialReadyRead() {
     qDebug() << "Received [" << data.length() << "]: " << data;
     serialData.append(data);
 
+    // end of string
     if (serialData.right(2) == "\r\n") {
         qDebug() << serialData.left(serialData.length() - 2);
+        QString data = serialData.left(serialData.length() - 2);
+        // first check for status messages
+        if (data == USBSTATUS_BEGIN || data == USBSTATUS_PONG) {
+            lblStatusTherm->setText("Connected");
+        } else if (data == USBSTATUS_END) {
+            lblStatusTherm->setText("Disconnected");
+        }
+
+        // then check for current mode
         if (serialCmdState == CMDSTATE_DATA) {
-            ui->plainTextEdit->document()->setPlainText(serialData.left(serialData.length() - 2).replace(',', '\n').replace(" ", "\n\n"));
+            ui->plainTextEdit->document()->setPlainText(data.replace(',', '\n').replace(" ", "\n\n"));
             serialCmdState = CMDSTATE_NONE;
         } else if (serialCmdState == CMDSTATE_EEPROM) {
-            ui->plainTextEdit->document()->setPlainText(serialData.left(serialData.length() - 2).replace(',', '\n').replace(" ", "\n\n"));
+            ui->plainTextEdit->document()->setPlainText(data.replace(',', '\n').replace(" ", "\n\n"));
             serialCmdState = CMDSTATE_NONE;
         } else if (serialCmdState == CMDSTATE_LIVE) {
-            ui->plainTextEdit->moveCursor (QTextCursor::End);
+            ui->plainTextEdit->moveCursor(QTextCursor::End);
             ui->plainTextEdit->insertPlainText(serialData);
-            serialData = "";
         }
+        serialData = "";
     }
 }
 

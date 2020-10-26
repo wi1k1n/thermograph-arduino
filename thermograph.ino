@@ -375,6 +375,10 @@ void loop() {
       else if (cmd == USBCMD_SENDLIVESTOP) {
         updateMeasurementUSB = false;
       }
+      // ping request
+      else if (cmd == USBCMD_PING) {
+        uart.println(USBSTATUS_PONG);
+      }
     }
   }
 }
@@ -632,9 +636,12 @@ void onButtonUSB() {
 }
 void startSerialUSB() {
   uart.begin(9600);
+  uart.println(USBSTATUS_BEGIN);
 }
 void endSerialUSB() {
   updateMeasurementUSB = false;
+  uart.println(USBSTATUS_END);
+  delay(5);
   uart.end();
 
   display = new Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
