@@ -48,7 +48,8 @@ Hold RIGHT button to exit SETTINGS screen.
 
 ## TODO list
 
-- USB mode
+- EEPROM [Save]/[Load] contain errors
+- range for graph is calculated in a wrong way (bcuz of bcarray)
 - Optimize memory usage
     - Display lib takes ~200 bytes of SRAM (+1KB is allocated dynamically on Heap)
     - Timers don't need all the internal variables (now each takes 13 bytes => 65 bytes in total)
