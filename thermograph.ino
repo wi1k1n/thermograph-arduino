@@ -67,9 +67,9 @@ const uint16_t PROGMEM settingsOptsGraphValsMSMask = 0b1100000000000001;  // 1 i
 byte settingsOptsGraphCur = 1;
 
 boolean graphCursMode = false;
-uint16_t graphCursI = 0;
-uint16_t graphCurs = 0;
-byte graphCursSteps = 0;
+uint16_t graphCursI = 0;  // shift of measData from which graph starts rendering
+uint16_t graphCurs = 0;  // current pos of cursor in measData coordinates
+byte graphCursSteps = 0;  // steps (for increasing graph cursor speed)
 
 // usb-mode
 boolean displayEnabled = true;
@@ -102,11 +102,11 @@ void setup() {
 
   // DEBUG!!!
   float decay = 1;
-  for (uint8_t i = 0; i < 100; i++) {
+  for (uint8_t i = 0; i < 150; i++) {
     const uint16_t amin = 438, amax = 583;
     tempValPartAverage = (amax - amin) * (0.5 * cos(i * 0.17f) + 0.5) * decay + amin;
     storeMeasurement();
-    decay *= 0.99;
+    decay *= 0.995;
   }
 
   tempValPartAverage = 0;
@@ -298,9 +298,11 @@ void loop() {
       if (menuScreen == MENUGRAPH) {
         // if graphCursor mode is active
         if (graphCursMode) {
-          // Serial.println(btnL.getHoldClicks());
-          graphCursorMove(++graphCursSteps < GRAPHBTNSTEPS4SPEED ? -1 : -GRAPHBTNSPEED);
-          forceMenuRedraw = true;
+          // if RIGHT is not holded
+          if (!btnR.isHold()) {
+            graphCursorMove(++graphCursSteps < GRAPHBTNSTEPS4SPEED ? -1 : -GRAPHBTNSPEED);
+            forceMenuRedraw = true;
+          }
         }
       }
     }
@@ -312,8 +314,11 @@ void loop() {
       if (menuScreen == MENUGRAPH) {
         // if graphCursor mode is active
         if (graphCursMode) {
-          graphCursorMove(++graphCursSteps < GRAPHBTNSTEPS4SPEED ? 1 : GRAPHBTNSPEED);
-          forceMenuRedraw = true;
+          // if LEFT is not holded
+          if (!btnL.isHold()) {  // TODO: this condition (as well as to other button) does not work!
+            graphCursorMove(++graphCursSteps < GRAPHBTNSTEPS4SPEED ? 1 : GRAPHBTNSPEED);
+            forceMenuRedraw = true;
+          }
         }
       }
     }
@@ -992,35 +997,27 @@ void displayGraph() {
     display->setCursor(0, 0);
     display->setTextColor(SSD1306_WHITE);  // Draw white text
     display->setTextSize(1);
-    
-    // display->print(graphCurs);
-    // display->print(F(" "));
-    // display->print(graphCursI);
-    // display->print(F(" "));
-    // display->print(dbgFlag);
-    // display->print(F("  "));
-    // display->print(bitRead(dbgFlag2, 0) ? F("1") : F("0"));
-    // display->print(bitRead(dbgFlag2, 1) ? F("1") : F("0"));
-
 
     // // draw current X position as -time
     // int16_t curBackTime = (cycled ? MEASDATALENGTH : (curs + 1)) - graphCurs;
-    // if (curBackTime > 0) {
-    //   display->setCursor(0, 0);
-    //   display->setTextColor(SSD1306_WHITE);  // Draw white text
-    //   display->setTextSize(1);
+    int16_t curBackTime = measData.count() - (int16_t)graphCurs;
+    if (curBackTime > 0) {
+      display->setCursor(0, 0);
+      display->setTextColor(SSD1306_WHITE);  // Draw white text
+      display->setTextSize(1);
 
-    //   formatBackTime(curBackTime * timerStoreTemp.getInterval(), tempStrBuf, 1);
-    //   if (curBackTime > 0) display->print('-');
-    //   display->print(tempStrBuf[1]);
-    //   display->print(tempStrBuf[2]);
-    //   display->print(tempStrBuf[3]);
-    //   display->print(tempStrBuf[4]);
+      formatBackTime(curBackTime * timerStoreTemp.getInterval(), tempStrBuf, 1);
+      if (curBackTime > 0) display->print('-');
+      display->print(tempStrBuf[1]);
+      display->print(tempStrBuf[2]);
+      display->print(tempStrBuf[3]);
+      display->print(tempStrBuf[4]);
       
-    //   display->setCursor(display->getCursorX() + 8, 0);
-    //   dtostrf(getTemp(cycled ? ((curs + graphCurs) % MEASDATALENGTH) : (graphCurs - 1)), 6, 2, tempStrBuf);
-    //   display->print(tempStrBuf);
-    // }
+      display->setCursor(display->getCursorX() + 8, 0);
+      // dtostrf(getTemp(cycled ? ((curs + graphCurs) % MEASDATALENGTH) : (graphCurs - 1)), 6, 2, tempStrBuf);
+      dtostrf(getTemp(graphCurs), 6, 2, tempStrBuf);
+      display->print(tempStrBuf);
+    }
   }
 
   forceMenuRedraw = false;

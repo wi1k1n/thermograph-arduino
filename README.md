@@ -58,6 +58,7 @@ Hold RIGHT button to exit SETTINGS screen.
     - Each GButton take ~23 bytes (could be less?), so ~46 bytes in total
 - Optimize flash usage
     - remove adafruit splash logo
+- [Pause] button
 
 ## Known bugs
 
@@ -65,3 +66,4 @@ Hold RIGHT button to exit SETTINGS screen.
 - Time estimations r not accurate (should be rounded instead of flooring)
 - No time memory (only considers current graph timeout setting, even if the whole graph has been built with different graph timeout)
 - Low memory
+- Holding both buttons does not stop graph cursor from moving
