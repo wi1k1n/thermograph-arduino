@@ -67,7 +67,8 @@ const uint16_t PROGMEM settingsOptsGraphValsMSMask = 0b1100000000000001;  // 1 i
 byte settingsOptsGraphCur = 1;
 
 boolean graphCursMode = false;
-byte graphCurs = 0;
+uint16_t graphCursI = 0;
+uint16_t graphCurs = 0;
 byte graphCursSteps = 0;
 
 // usb-mode
@@ -98,6 +99,17 @@ void setup() {
   
   delay(DISPLAYLOGODURATION);
   display->clearDisplay();
+
+  // DEBUG!!!
+  float decay = 1;
+  for (uint8_t i = 0; i < 100; i++) {
+    const uint16_t amin = 438, amax = 583;
+    tempValPartAverage = (amax - amin) * (0.5 * cos(i * 0.17f) + 0.5) * decay + amin;
+    storeMeasurement();
+    decay *= 0.99;
+  }
+
+  tempValPartAverage = 0;
 }
 
 void loop() {
@@ -209,7 +221,7 @@ void loop() {
       }
       // if graphCursor mode NOT active
       else {
-        // graphCurs = curs;
+        graphCurs = measData.count() - 1;
         graphCursMode = true;
         btnL.resetStates();
       }
@@ -883,6 +895,8 @@ void displayLive() {
 
 
 
+uint8_t dbgFlag = 0;
+uint8_t dbgFlag2 = 0;
 // build graph on the display
 void displayGraph() {
   if (isDimmed || !displayEnabled) return;
@@ -928,23 +942,37 @@ void displayGraph() {
     measChanged = false;
     display->fillRect(0, DISPLAYPADDINGTOP, SCREEN_WIDTH, DISPLAYDATAHEIGHT, SSD1306_BLACK);
 
-    // // i iterates from 0 to cursor (or from cursor+1 up to cursor, wrapping around the MEASDATALENGTH)
-    // byte i = cycled ? (curs + 1) : 0;
-    // byte prevX = 0;
-    // // constrain is needed to correctly fit into screen
-    // byte prevY = SCREEN_HEIGHT - GRAPHPADDINGBOT - ((int8_t)getTemp((i < MEASDATALENGTH ? i : 0)) - measMin8) * scale;
-    // for (byte x = 1;; i++, x++) {
-    //   if (i == MEASDATALENGTH) i = 0;  // wrap around i
-    //   if (i == curs) break;  // stop condition
-    //   byte y = SCREEN_HEIGHT - GRAPHPADDINGBOT - ((int8_t)getTemp(i) - measMin8) * scale;
-    //   display->drawLine(prevX, prevY, x, y, SSD1306_WHITE);
-    //   prevX = x;
-    //   prevY = y;
-    // }
-
-    byte prevX = 0;
     // i might start from >0, since measData.count() can be bigger, than SCREEN_WIDTH
     uint16_t i = max(0, (int16_t)measData.count() - SCREEN_WIDTH);
+
+    // if graph cursor mode is ON, we can move cursor beyond usually visible parts
+    // so simply override starting index
+    // dbgFlag = 0;
+    // dbgFlag2 = 0;
+    if (graphCursMode) {
+      // if graphCurs if in left side padding zone
+      if ((int16_t)graphCurs - graphCursI <= GRAPHCURSORSIDEPADDING) {
+        graphCursI = max(0, (int16_t)graphCurs - GRAPHCURSORSIDEPADDING);
+        // dbgFlag = 1;
+      }
+      // graphCurs in right side padding zone OR outside of screen to the left (wrapped around to 0)
+      else if (graphCursI + SCREEN_WIDTH - (int16_t)graphCurs <= GRAPHCURSORSIDEPADDING) {
+        graphCursI = min(measData.length() - SCREEN_WIDTH, (int16_t)graphCurs + GRAPHCURSORSIDEPADDING - SCREEN_WIDTH);
+        // dbgFlag = 2;
+      }
+      // graphCurs in the middle zone
+      else {
+        // dbgFlag = 3;
+      }
+      // check if cursor is outside of screen area (after it was wrapped around)
+      if ((int16_t)graphCurs - graphCursI >= SCREEN_WIDTH) {
+        // dbgFlag2 += 1;
+        graphCursI = max((int16_t)graphCurs - SCREEN_WIDTH + 1, 0);
+      }
+      i = graphCursI;
+    }
+
+    byte prevX = 0;
     byte prevY = SCREEN_HEIGHT - GRAPHPADDINGBOT - ((int8_t)getTemp(i) - measMin8) * scale;
     for (uint8_t x = 0; i < measData.count(); i++, x++) {
       uint8_t y = SCREEN_HEIGHT - GRAPHPADDINGBOT - ((int8_t)getTemp(i) - measMin8) * scale;
@@ -956,10 +984,25 @@ void displayGraph() {
 
   /* === draw cursor === */
   if (graphCursMode) {
-    // display->drawLine(graphCurs, DISPLAYPADDINGTOP, graphCurs, SCREEN_HEIGHT, SSD1306_WHITE);
-    
+    uint8_t graphCursOnScreen = min(max((int16_t)graphCurs - graphCursI, 0), SCREEN_WIDTH);
+    display->drawLine(graphCursOnScreen, DISPLAYPADDINGTOP, graphCursOnScreen, SCREEN_HEIGHT, SSD1306_WHITE);
     
     display->fillRect(0, 0, SCREEN_WIDTH, DISPLAYPADDINGTOP, SSD1306_BLACK);
+
+    display->setCursor(0, 0);
+    display->setTextColor(SSD1306_WHITE);  // Draw white text
+    display->setTextSize(1);
+    
+    // display->print(graphCurs);
+    // display->print(F(" "));
+    // display->print(graphCursI);
+    // display->print(F(" "));
+    // display->print(dbgFlag);
+    // display->print(F("  "));
+    // display->print(bitRead(dbgFlag2, 0) ? F("1") : F("0"));
+    // display->print(bitRead(dbgFlag2, 1) ? F("1") : F("0"));
+
+
     // // draw current X position as -time
     // int16_t curBackTime = (cycled ? MEASDATALENGTH : (curs + 1)) - graphCurs;
     // if (curBackTime > 0) {
@@ -983,13 +1026,12 @@ void displayGraph() {
   forceMenuRedraw = false;
   display->display();
 }
-// TODO: does not consider that measData.count() can be > SCREEN_WIDTH
 void graphCursorMove(const int8_t dir) {
-  if ((int8_t)graphCurs + dir < 0)
+  if ((int16_t)graphCurs + dir < 0) {
     graphCurs = measData.length() - 1;
-  else if ((int8_t)graphCurs + dir >= measData.length())
+  } else if ((int16_t)graphCurs + dir >= measData.length()) {
     graphCurs = 0;
-  else graphCurs += dir;
+  } else graphCurs += dir;
 }
 
 

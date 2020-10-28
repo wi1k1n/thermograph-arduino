@@ -1,7 +1,7 @@
 // Main constants
 #define TEMPAVERAGEN 20  // [0..63] - number of intermediate measurements
 // #define MEASDATALENGTH 80  // bigger than min(SCREEN_WIDTH, 254) is not supported yet!
-#define MEASDATABYTELENGTH 80  // number of bytes to allocate (final available length: MEASDATABYTELENGTH * 8 / MP_CAP)
+#define MEASDATABYTELENGTH 70  // number of bytes to allocate (final available length: MEASDATABYTELENGTH * 8 / MP_CAP)
 
 // Manual precision constants
 #define MP_CAP 4  // manual precision capacity: {3, 4, 5, 6, 7, 8}
@@ -41,8 +41,6 @@
 #define DISPLAYPADDINGTOP 16
 #define DISPLAYDATAHEIGHT (SCREEN_HEIGHT - DISPLAYPADDINGTOP)  // SCREEN_HEIGHT - DISPLAYPADDINGTOP
 #define DISPLAYLOGODURATION 1500
-#define GRAPHPADDINGTOP 2  // extra padding for graph area (to make graph cursor visually more recognizable)
-#define GRAPHPADDINGBOT 2
 
 // Menu constants
 #define MENULIVE      0
@@ -50,8 +48,11 @@
 #define MENUSETTINGS  2
 
 // Menu: Graph constants
-#define GRAPHBTNSTEPS4SPEED 15  // steps after which speed is increased by GRAPHBTNSPEED
-#define GRAPHBTNSPEED 2
+#define GRAPHBTNSTEPS4SPEED 20  // steps after which speed is increased by GRAPHBTNSPEED
+#define GRAPHBTNSPEED 3
+#define GRAPHPADDINGTOP 4  // extra padding for graph area (to make graph cursor visually more recognizable)
+#define GRAPHPADDINGBOT 2
+#define GRAPHCURSORSIDEPADDING 16  // padding, which is held while cursor is moving beyond visible area
 
 // Menu: Settings
 #define SETTINGSDIMMING         0
