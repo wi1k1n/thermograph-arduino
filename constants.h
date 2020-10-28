@@ -1,6 +1,6 @@
 // Main constants
 #define TEMPAVERAGEN 20  // [0..63] - number of intermediate measurements
-#define MEASDATALENGTH 128  // bigger than min(SCREEN_WIDTH, 254) is not supported yet!
+#define MEASDATALENGTH 80  // bigger than min(SCREEN_WIDTH, 254) is not supported yet!
 
 // Manual precision constants
 #define MP_CAP 4  // manual precision capacity: {3, 4, 5, 6, 7, 8}

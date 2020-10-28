@@ -49,6 +49,7 @@ Hold RIGHT button to exit SETTINGS screen.
 ## TODO list
 
 - EEPROM [Save]/[Load] contain errors
+    - with fixed eeprom start index works well
 - range for graph is calculated in a wrong way (bcuz of bcarray)
 - bcarray: correct wraping for cursor (leave unused space of last byte untouched!)
 - Optimize memory usage

@@ -582,20 +582,35 @@ void onButtonSave() {
   if (dataCurs >= dataLength) dataCurs = 0;
   
   // calculate start index for current saving (for reducing eeprom wear)
-  uint32_t eepromCurs = indOfStart + (uint16_t)ceil(dataLength * mpcap / 8.f);
-  if (eepromCurs >= EEPROMDATAENDINDEX)
-    eepromCurs -= EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX;  // wrap cursor around
+  uint32_t eepromStart = indOfStart + (uint16_t)ceil(dataLength * mpcap / 8.f);
+  if (eepromStart >= EEPROMDATAENDINDEX)
+    eepromStart -= EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX;  // wrap cursor around
 
+
+  // dbg_begin();
+  // uart.println();
+  // TODO!!!! eepromCurs = 7;
   // put measured data to eeprom byte-by-byte
-  uint16_t iStopInd = (uint16_t)ceil(curs * MP_CAP / 8.f);
+  uint16_t eepromCurs = eepromStart;
+  uint16_t iStopInd = (uint16_t)ceil((cycled ? measArr->byteLength() : curs) * MP_CAP / 8.f);
+  // uart.println(eepromCurs);
+  // uart.println(iStopInd);
+  // uart.println(curs);
+  // uart.println();
   for (uint8_t i = 0;; i++, eepromCurs++) {  // uint16_t for MEGA
     if (i == iStopInd) break;  // stop condition
     if (eepromCurs >= EEPROMDATAENDINDEX) eepromCurs = EEPROMDATASTARTINDEX;
     EEPROM.put(eepromCurs, measArr->byteArray()[i]);
+    // uart.println(measArr->byteArray()[i]);
   }
 
+  // uart.println();
+  // uart.println(eepromCurs);
+  // delay(100);
+  // dbg_end();
+
   // update service bytes
-  eepromPutIndLen(eepromCurs, cycled ? measArr->byteLength() : curs, MP_MIN, MP_MAX, MP_CAP, curs, cycled);
+  eepromPutIndLen(eepromStart, cycled ? measArr->byteLength() : curs, MP_MIN, MP_MAX, MP_CAP, curs, cycled);
 }
 // load data from eeprom
 void onButtonLoad() {
@@ -616,17 +631,29 @@ void onButtonLoad() {
     else mpmax = mpmin + 1;
   }
   mpcap = constrain(mpcap, 2, 8);
-  if ((uint16_t)(dataLength * mpcap / 8) + 1 > EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX)
-    dataLength = (uint16_t)((EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX) * 8 / mpcap) + 1;
-  if (dataCurs >= dataLength) dataCurs = 0;
+  if ((uint16_t)ceil(dataLength * mpcap / 8.f) > EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX)
+    dataLength = (uint16_t)((EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX) * 8 / mpcap);
+  if (dataCurs >= measArr->length()) dataCurs = 0;
 
+  // dbg_begin();
+  // uart.println();
+  // uart.println(indOfStart);
+  // uart.println();
+
+  // indOfStart = 7;
   // load measurements byte-by-byte
   for (uint8_t i = 0; i < dataLength; i++, indOfStart++) {  // uint16_t for MEGA
     if (indOfStart >= EEPROMDATAENDINDEX) indOfStart = EEPROMDATAENDINDEX;
     EEPROM.get(indOfStart, measArr->byteArray()[i]);
+    // uart.println(measArr->byteArray()[i]);
   }
   cycled = cycl;
   curs = dataCurs;
+  
+  // uart.println();
+  // uart.println((int)indOfStart);
+  // delay(100);
+  // dbg_end();
 
   //TODO: mpmin/mpmax should be considered here
 
@@ -1113,4 +1140,17 @@ void putTemp(const uint16_t idx, float temp) {
     float tShifted = constrain(temp, MP_MIN, MP_MAX) - MP_MIN;
     uint8_t tMeas = (uint8_t)(tShifted * MP_CAPN / MP_RANGE);
     measArr->put(idx, tMeas);
+}
+
+
+void dbg_begin() {
+  destroyDisplay();
+  displayEnabled = false;
+  uart.begin(9600);
+}
+void dbg_end() {
+  uart.end();
+  display = new Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+  initDisplay(false);
+  displayEnabled = true;
 }
