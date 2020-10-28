@@ -425,11 +425,16 @@ void initDisplay(const boolean logo) {
 }
 // takes 
 void initParamsFromEEPROM() {
+  // dim (3 bit) - dimming timeout
+  // graph (4 bit) - graph update timeout
+  // menu (2 bit) - last visited menu
+  // s_line (3 bit) - last selected entry in settings
+  //
+  //          b1022                      b1023
+  // 15 14 13  12 11 10 09  08 |  07  06 05 04   03 02 01 00
+  // <- dim->  <- graph ->  < menu >  <s_line>
   uint16_t params;
   EEPROM.get(EEPROM.length() - 2, params);
-  // 3 bits for dim, 4 bits for graph, 2 bits for last_menu, 3 bits for setting_entry
-  // 15 14 13   12 11 10 9   8 7   6 5 4   3 2 1 0   <- bits
-  //   dim         graph    menu   s_line            <- vars
   settingsOptsDimmingCur = params >> 13;
   settingsOptsGraphCur = (params >> 9) & 15;
   menuScreen = (params >> 7) & 3;
@@ -543,6 +548,24 @@ void onButtonSave() {
   boolean cycl;
   eepromGetIndLen(indOfStart, dataLength, mpmin, mpmax, mpcap, dataCurs, cycl);
 
+  // display->setCursor(0, 0);
+  // display->print(indOfStart);
+  // display->print(' ');
+  // display->print(dataLength);
+  // display->print(' ');
+  // display->print(dataCurs);
+  // display->setCursor(0, 8);
+  // display->print(mpmin);
+  // display->print(' ');
+  // display->print(mpmax);
+  // display->print(' ');
+  // display->print(mpcap);
+  // display->print(' ');
+  // display->print(cycl);
+  // display->display();
+
+  // return;
+
   // validate and "constrain"
   // first 7 bytes and last 2 bytes are reserved as service storage
   if (indOfStart < EEPROMDATASTARTINDEX || indOfStart >= EEPROMDATAENDINDEX) indOfStart = EEPROMDATASTARTINDEX;
@@ -554,25 +577,25 @@ void onButtonSave() {
   //   else mpmax = mpmin + 1;
   // }
   // mpcap = constrain(mpcap, 2, 8);
-  if ((uint16_t)(dataLength * mpcap / 8) + 1 > EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX)
-    dataLength = (uint16_t)((EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX) * 8 / mpcap) + 1;
+  if ((uint16_t)ceil(dataLength * mpcap / 8.f) > EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX)
+    dataLength = (uint16_t)ceil((EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX) * 8.f / mpcap);
   if (dataCurs >= dataLength) dataCurs = 0;
   
   // calculate start index for current saving (for reducing eeprom wear)
-  uint32_t eepromCurs = indOfStart + (uint16_t)(dataLength * mpcap / 8) + 1;
+  uint32_t eepromCurs = indOfStart + (uint16_t)ceil(dataLength * mpcap / 8.f);
   if (eepromCurs >= EEPROMDATAENDINDEX)
-    eepromCurs = EEPROMDATASTARTINDEX;
+    eepromCurs -= EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX;  // wrap cursor around
 
   // put measured data to eeprom byte-by-byte
+  uint16_t iStopInd = (uint16_t)ceil(curs * MP_CAP / 8.f);
   for (uint8_t i = 0;; i++, eepromCurs++) {  // uint16_t for MEGA
-    if (i == measArr->byteLength()) i = 0;  // wrap around i
-    if (i == (cycled ? curs : measArr->byteLength())) break;  // stop condition
+    if (i == iStopInd) break;  // stop condition
     if (eepromCurs >= EEPROMDATAENDINDEX) eepromCurs = EEPROMDATASTARTINDEX;
     EEPROM.put(eepromCurs, measArr->byteArray()[i]);
   }
 
   // update service bytes
-  eepromPutIndLen(eepromCurs, cycled ? curs : measArr->byteLength(), MP_MIN, MP_MAX, MP_CAP, curs, cycled);
+  eepromPutIndLen(eepromCurs, cycled ? measArr->byteLength() : curs, MP_MIN, MP_MAX, MP_CAP, curs, cycled);
 }
 // load data from eeprom
 void onButtonLoad() {
@@ -654,32 +677,35 @@ void eepromGetIndLen(uint16_t &ind,
   //             b5                      b6
   // 15 14 13 12 11 10 09 08 | 07 06 05 04 03 02 01 00
   // <- MPCAP -> <------- dataCursor (12bits) ------->
-  uint32_t indLenMin;
-  EEPROM.get(0, indLenMin);
-  ind = indLenMin >> 22;
-  cycl = bitRead(indLenMin, 20);
-  len = (indLenMin >> 8) & 0xFFF;
-  mpmin = indLenMin & 0xFF;
+  uint8_t b0, b1, b2, b5, b6;
+  EEPROM.get(0, b0);
+  EEPROM.get(1, b1);
+  EEPROM.get(2, b2);
+  EEPROM.get(3, mpmin);
   EEPROM.get(4, mpmax);
-  uint16_t capCurs;
-  EEPROM.get(5, capCurs);
-  mpcap = capCurs >> 12;
-  curs = capCurs & 0xFFF;
+  EEPROM.get(5, b5);
+  EEPROM.get(6, b6);
+  ind = b0 << 2 | b1 >> 6;
+  cycl = bitRead(b1, 4);
+  len = (b1 & 0xF) << 8 | b2;
+  mpcap = b5 >> 4;
+  curs = (b5 & 0xF) << 8 | b6;
 }
 void eepromPutIndLen(const uint16_t &ind,
                      const uint16_t &len,
                      const int8_t &mpmin,
                      const int8_t &mpmax,
                      const uint8_t &mpcap,
-                     const uint16_t &curs,
+                     const uint16_t &dcurs,
                      const boolean &cycl) {
   // args same as in eepromGetIndLen
-  uint32_t indLenMin = (((ind << 16) | len) << 8) | mpmin;
-  bitWrite(indLenMin, 20, cycl);
-  uint16_t capCurs = (mpcap << 12) | curs;
-  EEPROM.put(0, indLenMin);
+  EEPROM.put(0, ind >> 2);
+  EEPROM.put(1, ((ind & 0x3) << 2 | cycl) << 4 | len >> 8);
+  EEPROM.put(2, len & 0xFF);
+  EEPROM.put(3, mpmin);
   EEPROM.put(4, mpmax);
-  EEPROM.put(5, capCurs);
+  EEPROM.put(5, mpcap << 4 | dcurs >> 8);
+  EEPROM.put(6, dcurs & 0xFF);
 }
 // turn USB synchronization mode on
 void onButtonUSB() {
