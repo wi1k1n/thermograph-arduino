@@ -40,7 +40,7 @@ float measMin = INT32_MAX;
 float measMax = INT32_MIN;
 float measMinG = INT32_MAX;
 float measMaxG = INT32_MIN;
-int8_t measMin8 = INT8_MAX;
+// int8_t measMin8 = INT8_MAX;
 // int16_t measMinInd = 0;
 // int16_t measMaxInd = 0;
 
@@ -101,15 +101,15 @@ void setup() {
   display->clearDisplay();
 
   // DEBUG!!!
-  float decay = 1;
-  for (uint8_t i = 0; i < 150; i++) {
-    const uint16_t amin = 438, amax = 583;
-    tempValPartAverage = (amax - amin) * (0.5 * cos(i * 0.17f) + 0.5) * decay + amin;
-    storeMeasurement();
-    decay *= 0.995;
-  }
+  // float decay = 1;
+  // for (uint8_t i = 0; i < 150; i++) {
+  //   const uint16_t amin = 438, amax = 583;
+  //   tempValPartAverage = (amax - amin) * (0.5 * cos(i * 0.17f) + 0.5) * decay + amin;
+  //   storeMeasurement();
+  //   decay *= 0.995;
+  // }
 
-  tempValPartAverage = 0;
+  // tempValPartAverage = 0;
 }
 
 void loop() {
@@ -223,6 +223,7 @@ void loop() {
       else {
         graphCurs = measData.count() - 1;
         graphCursMode = true;
+        recalcMinMaxRange();
         btnL.resetStates();
       }
     }
@@ -331,6 +332,7 @@ void loop() {
       if (graphCursMode) {
         // graphCurs = 255;
         graphCursMode = false;
+        recalcMinMaxRange();
         forceMenuRedraw = true;
       }
     }
@@ -562,7 +564,7 @@ void onButtonReset() {
     measMax = DMIN;
     measMinG = DMAX;
     measMaxG = DMIN;
-    measMin8 = DMAX;
+    // measMin8 = DMAX;
     // measMinInd = 0;
     // measMaxInd = 0;
     scale = 2.f;
@@ -571,156 +573,150 @@ void onButtonReset() {
 }
 // save stored data to eeprom
 void onButtonSave() {
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, HIGH);
-  delay(100);
-  digitalWrite(LED_BUILTIN, LOW);
-  return;
-  // // first 7 bytes of eeprom contain service info
-  // uint16_t indOfStart, dataLength, dataCurs;
-  // int8_t mpmin, mpmax;
-  // uint8_t mpcap;
-  // boolean cycl;
-  // eepromGetIndLen(indOfStart, dataLength, mpmin, mpmax, mpcap, dataCurs, cycl);
+  // pinMode(LED_BUILTIN, OUTPUT);
+  // digitalWrite(LED_BUILTIN, HIGH);
+  // delay(100);
+  // digitalWrite(LED_BUILTIN, LOW);
+  // return;
 
-  // // display->setCursor(0, 0);
-  // // display->print(indOfStart);
-  // // display->print(' ');
-  // // display->print(dataLength);
-  // // display->print(' ');
-  // // display->print(dataCurs);
-  // // display->setCursor(0, 8);
-  // // display->print(mpmin);
-  // // display->print(' ');
-  // // display->print(mpmax);
-  // // display->print(' ');
-  // // display->print(mpcap);
-  // // display->print(' ');
-  // // display->print(cycl);
-  // // display->display();
+  // first 7 bytes of eeprom contain service info
+  uint16_t indOfStart, dataLength, dataCurs;
+  int8_t mpmin, mpmax;
+  uint8_t mpcap;
+  boolean cycl;
+  eepromGetIndLen(indOfStart, dataLength, mpmin, mpmax, mpcap, dataCurs, cycl);
 
-  // // return;
+  // display->setCursor(0, 0);
+  // display->print(indOfStart);
+  // display->print(' ');
+  // display->print(dataLength);
+  // display->print(' ');
+  // display->print(dataCurs);
+  // display->setCursor(0, 8);
+  // display->print(mpmin);
+  // display->print(' ');
+  // display->print(mpmax);
+  // display->print(' ');
+  // display->print(mpcap);
+  // display->print(' ');
+  // display->print(cycl);
+  // display->display();
 
-  // // validate and "constrain"
-  // // first 7 bytes and last 2 bytes are reserved as service storage
-  // if (indOfStart < EEPROMDATASTARTINDEX || indOfStart >= EEPROMDATAENDINDEX) indOfStart = EEPROMDATASTARTINDEX;
-  // // mpmin = constrain(mpmin, DMIN, DMAX);
-  // // mpmax = constrain(mpmax, DMIN, DMAX);
-  // // if (mpmax - mpmin < 1) {
-  // //   mpmax = mpmin;
-  // //   if (mpmax >= 127) mpmin = 126;
-  // //   else mpmax = mpmin + 1;
-  // // }
-  // // mpcap = constrain(mpcap, 2, 8);
-  // if ((uint16_t)ceil(dataLength * mpcap / 8.f) > EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX)
-  //   dataLength = (uint16_t)ceil((EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX) * 8.f / mpcap);
+  // return;
+
+  // validate and "constrain"
+  // first 7 bytes and last 2 bytes are reserved as service storage
+  if (indOfStart < EEPROMDATASTARTINDEX || indOfStart >= EEPROMDATAENDINDEX) indOfStart = EEPROMDATASTARTINDEX;
+  if (dataLength >= EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX)
+    dataLength = EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX;
   // if (dataCurs >= dataLength) dataCurs = 0;
   
-  // // calculate start index for current saving (for reducing eeprom wear)
-  // uint32_t eepromStart = indOfStart + (uint16_t)ceil(dataLength * mpcap / 8.f);
-  // if (eepromStart >= EEPROMDATAENDINDEX)
-  //   eepromStart -= EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX;  // wrap cursor around
+  // calculate start index for current saving (for reducing eeprom wear)
+  uint32_t eepromStart = indOfStart + dataLength;
+  if (eepromStart >= EEPROMDATAENDINDEX)
+    eepromStart -= EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX;  // wrap cursor around
 
 
-  // // dbg_begin();
-  // // uart.println();
-  // // TODO!!!! eepromCurs = 7;
-  // // put measured data to eeprom byte-by-byte
-  // uint16_t eepromCurs = eepromStart;
+  // dbg_begin();
+  // uart.println();
+  // TODO!!!! eepromCurs = 7;
+  // put measured data to eeprom byte-by-byte
+  uint16_t eepromCurs = eepromStart;
   // uint16_t iStopInd = (uint16_t)ceil((cycled ? measArr->byteLength() : curs) * MP_CAP / 8.f);
-  // // uart.println(eepromCurs);
-  // // uart.println(iStopInd);
-  // // uart.println(curs);
-  // // uart.println();
-  // for (uint8_t i = 0;; i++, eepromCurs++) {  // uint16_t for MEGA
-  //   if (i == iStopInd) break;  // stop condition
-  //   if (eepromCurs >= EEPROMDATAENDINDEX) eepromCurs = EEPROMDATASTARTINDEX;
-  //   EEPROM.put(eepromCurs, measArr->byteArray()[i]);
-  //   // uart.println(measArr->byteArray()[i]);
-  // }
+  // uart.println(eepromCurs);
+  // uart.println(iStopInd);
+  // uart.println(curs);
+  // uart.println();
+  for (uint8_t i = 0; i < measData.byteLength(); i++, eepromCurs++) {  // uint16_t for MEGA
+    if (eepromCurs >= EEPROMDATAENDINDEX) eepromCurs = EEPROMDATASTARTINDEX;
+    EEPROM.put(eepromCurs, measData.byteArray()[i]);
+    // uart.println(measArr->byteArray()[i]);
+  }
 
-  // // uart.println();
-  // // uart.println(eepromCurs);
-  // // delay(100);
-  // // dbg_end();
+  // uart.println();
+  // uart.println(eepromCurs);
+  // delay(100);
+  // dbg_end();
 
-  // // update service bytes
-  // eepromPutIndLen(eepromStart, cycled ? measArr->byteLength() : curs, MP_MIN, MP_MAX, MP_CAP, curs, cycled);
+  // update service bytes
+  eepromPutIndLen(eepromStart, measData.byteLength(), MP_MIN, MP_MAX, MP_CAP, measData.cursor(), measData.cycled());
 }
 // load data from eeprom
 void onButtonLoad() {
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, HIGH);
-  delay(100);
-  digitalWrite(LED_BUILTIN, LOW);
-  return;
+  // pinMode(LED_BUILTIN, OUTPUT);
+  // digitalWrite(LED_BUILTIN, HIGH);
+  // delay(100);
+  // digitalWrite(LED_BUILTIN, LOW);
+  // return;
 
-  // // load service information from eeprom
-  // uint16_t indOfStart, dataLength, dataCurs;
-  // int8_t mpmin, mpmax;
-  // uint8_t mpcap;
-  // boolean cycl;
-  // eepromGetIndLen(indOfStart, dataLength, mpmin, mpmax, mpcap, dataCurs, cycl);
+  // load service information from eeprom
+  uint16_t indOfStart, dataLength, dataCurs;
+  int8_t mpmin, mpmax;
+  uint8_t mpcap;
+  boolean cycl;
+  eepromGetIndLen(indOfStart, dataLength, mpmin, mpmax, mpcap, dataCurs, cycl);
 
-  // // validate and "constrain"
-  // if (indOfStart < EEPROMDATASTARTINDEX || indOfStart >= EEPROMDATAENDINDEX) indOfStart = EEPROMDATASTARTINDEX;
-  // mpmin = constrain(mpmin, DMIN, DMAX);
-  // mpmax = constrain(mpmax, DMIN, DMAX);
-  // if (mpmax - mpmin < 1) {
-  //   mpmax = mpmin;
-  //   if (mpmax >= 127) mpmin = 126;
-  //   else mpmax = mpmin + 1;
-  // }
-  // mpcap = constrain(mpcap, 2, 8);
-  // if ((uint16_t)ceil(dataLength * mpcap / 8.f) > EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX)
-  //   dataLength = (uint16_t)((EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX) * 8 / mpcap);
-  // if (dataCurs >= measArr->length()) dataCurs = 0;
+  // validate and "constrain"
+  if (indOfStart < EEPROMDATASTARTINDEX || indOfStart >= EEPROMDATAENDINDEX) indOfStart = EEPROMDATASTARTINDEX;
+  if (dataLength >= EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX)
+    dataLength = EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX;
+  mpmin = constrain(mpmin, DMIN, DMAX);
+  mpmax = constrain(mpmax, DMIN, DMAX);
+  if (mpmax - mpmin < 1) {
+    mpmax = mpmin;
+    if (mpmax >= 127) mpmin = 126;
+    else mpmax = mpmin + 1;
+  }
+  mpcap = constrain(mpcap, 2, 8);
 
-  // // dbg_begin();
-  // // uart.println();
-  // // uart.println(indOfStart);
-  // // uart.println();
+  // dbg_begin();
+  // uart.println();
+  // uart.println(indOfStart);
+  // uart.println();
 
-  // // indOfStart = 7;
-  // // load measurements byte-by-byte
-  // for (uint8_t i = 0; i < dataLength; i++, indOfStart++) {  // uint16_t for MEGA
-  //   if (indOfStart >= EEPROMDATAENDINDEX) indOfStart = EEPROMDATAENDINDEX;
-  //   EEPROM.get(indOfStart, measArr->byteArray()[i]);
-  //   // uart.println(measArr->byteArray()[i]);
-  // }
+  // indOfStart = 7;
+  // load measurements byte-by-byte
+  for (uint8_t i = 0; i < dataLength; i++, indOfStart++) {  // uint16_t for MEGA
+    if (indOfStart >= EEPROMDATAENDINDEX) indOfStart = EEPROMDATAENDINDEX;
+    EEPROM.get(indOfStart, measData.byteArray()[i]);
+    // uart.println(measArr->byteArray()[i]);
+  }
+  measData.setCycled(cycl);
+  measData.setCursor(dataCurs);
   // cycled = cycl;
   // curs = dataCurs;
   
-  // // uart.println();
-  // // uart.println((int)indOfStart);
-  // // delay(100);
-  // // dbg_end();
+  // uart.println();
+  // uart.println((int)indOfStart);
+  // delay(100);
+  // dbg_end();
 
-  // //TODO: mpmin/mpmax should be considered here
+  //TODO: mpmin/mpmax should be considered here
 
-  // // display->setCursor(0, 0);
-  // // display->setTextColor(SSD1306_WHITE);
-  // // display->setTextSize(1);
+  // display->setCursor(0, 0);
+  // display->setTextColor(SSD1306_WHITE);
+  // display->setTextSize(1);
 
-  // // display->print(measMin);
-  // // display->print(' ');
+  // display->print(measMin);
+  // display->print(' ');
 
-  // // recalculateMin();
-  // // recalculateMax();
-  // // recalculateRange();
-  // recalcMinMaxRange();
+  // recalculateMin();
+  // recalculateMax();
+  // recalculateRange();
 
-  // if (measMin < measMinG) measMinG = measMin;
-  // if (measMax > measMaxG) measMaxG = measMax;
+  recalcMinMaxRange();
 
-  // // display->print(measMin);
-  // // display->display();
+  if (measMin < measMinG) measMinG = measMin;
+  if (measMax > measMaxG) measMaxG = measMax;
 
-  // // delay(1000);
+  // display->print(measMin);
+  // display->display();
+
+  // delay(1000);
   
-  // tempValPartAverage = 0;
-  // tempValN = 0;
-  // measurePartial();
+  tempValPartAverage = 0;
+  tempValN = 0;
+  measurePartial();
 }
 // reads eepromCursor and dataLength from eeprom
 void eepromGetIndLen(uint16_t &ind,
@@ -731,7 +727,7 @@ void eepromGetIndLen(uint16_t &ind,
                      uint16_t &curs,
                      boolean &cycl) {
   // ind - index of byte in eeprom where data starts
-  // len - number of numbers (NOT bytes!) stored in eeprom
+  // len - number of bytes (NOT numbers!) stored in eeprom
   // mpmin/mpmax - min/max values of temperature (in degrees)
   // mpcap - number of bits used for each number
   // curs - index of number (NOT byte!) in data where measurements start
@@ -739,14 +735,14 @@ void eepromGetIndLen(uint16_t &ind,
   //
   // first 7 bytes of eeprom contain service info:
   //           b0                         b1                         b2
-  // 23 22 21 20 19 18 17 16 | 15 14 13  12  11 10 09 08 | 07 06 05 04 03 02 01 00
-  // <--- indexOfStart (10bits) --->    cycl <------- dataLength (12bits) ------->
+  // 23 22 21 20 19 18 17 16 | 15 14 13 12 11 10 09 08 | 07 06 05 04 03 02 01 00
+  // <------ indexOfStart (12bits) ------> <------- dataLength (12bits) ------->
   //           b3                        b4           
   // 23 22 21 20 19 18 17 16 | 15 14 13 12 11 10 09 08
   // <--- MPMIN (8bits) --->   <--- MPMAX (8bits) --->
   //             b5                      b6
-  // 15 14 13 12 11 10 09 08 | 07 06 05 04 03 02 01 00
-  // <- MPCAP -> <------- dataCursor (12bits) ------->
+  // 15 14 13   12  11 10 09 08 | 07 06 05 04 03 02 01 00
+  // <-MPCAP-> cycl <------- dataCursor (12bits) ------->
   uint8_t b0, b1, b2, b5, b6;
   EEPROM.get(0, b0);
   EEPROM.get(1, b1);
@@ -755,10 +751,10 @@ void eepromGetIndLen(uint16_t &ind,
   EEPROM.get(4, mpmax);
   EEPROM.get(5, b5);
   EEPROM.get(6, b6);
-  ind = b0 << 2 | b1 >> 6;
-  cycl = bitRead(b1, 4);
+  ind = b0 << 4 | b1 >> 4;
   len = (b1 & 0xF) << 8 | b2;
-  mpcap = b5 >> 4;
+  mpcap = (uint8_t)(b5 >> 5) + 1;
+  cycl = bitRead(b5, 4);
   curs = (b5 & 0xF) << 8 | b6;
 }
 void eepromPutIndLen(const uint16_t &ind,
@@ -769,13 +765,13 @@ void eepromPutIndLen(const uint16_t &ind,
                      const uint16_t &dcurs,
                      const boolean &cycl) {
   // args same as in eepromGetIndLen
-  EEPROM.put(0, ind >> 2);
-  EEPROM.put(1, ((ind & 0x3) << 2 | cycl) << 4 | len >> 8);
-  EEPROM.put(2, len & 0xFF);
+  EEPROM.put(0, (uint8_t)(ind >> 4));
+  EEPROM.put(1, (uint8_t)((ind & 0xF) << 4 | (len >> 8)));
+  EEPROM.put(2, (uint8_t)(len & 0xFF));
   EEPROM.put(3, mpmin);
   EEPROM.put(4, mpmax);
-  EEPROM.put(5, mpcap << 4 | dcurs >> 8);
-  EEPROM.put(6, dcurs & 0xFF);
+  EEPROM.put(5, (uint8_t)((mpcap - 1) << 1 | ((uint8_t)cycl)) << 4 | dcurs >> 8);
+  EEPROM.put(6, (uint8_t)(dcurs & 0xFF));
 }
 // turn USB synchronization mode on
 void onButtonUSB() {
@@ -978,9 +974,9 @@ void displayGraph() {
     }
 
     byte prevX = 0;
-    byte prevY = SCREEN_HEIGHT - GRAPHPADDINGBOT - ((int8_t)getTemp(i) - measMin8) * scale;
+    byte prevY = SCREEN_HEIGHT - GRAPHPADDINGBOT - (getTemp(i) - measMin) * scale;
     for (uint8_t x = 0; i < measData.count(); i++, x++) {
-      uint8_t y = SCREEN_HEIGHT - GRAPHPADDINGBOT - ((int8_t)getTemp(i) - measMin8) * scale;
+      uint8_t y = SCREEN_HEIGHT - GRAPHPADDINGBOT - (getTemp(i) - measMin) * scale;
       display->drawLine(prevX, prevY, x, y, SSD1306_WHITE);
       prevX = x;
       prevY = y;
@@ -1123,24 +1119,6 @@ void storeMeasurement() {
   tempValN = 0;
   measurePartial();
   
-  // check, if are going to override min or max value
-  // bool recalcMin = curs == measMinInd;
-  // bool recalcMax = curs == measMaxInd;
-  // bool recalcRange = false;
-  
-  // update min/max and scale variables
-  // if (temp < measMin) {
-  //   measMin = temp;
-  //   measMinInd = curs;
-  //   recalcMin = false;
-  //   recalcRange = true;
-  // }
-  // if (temp > measMax) {
-  //   measMax = temp;
-  //   measMaxInd = curs;
-  //   recalcMax = false;
-  //   recalcRange = true;
-  // }
   // update global min/max
   if (temp < measMinG) measMinG = temp;
   if (temp > measMaxG) measMaxG = temp;
@@ -1149,76 +1127,22 @@ void storeMeasurement() {
   pushTemp(temp);
   measChanged = true;
 
-  // increment curs
-  // measChanged = true;
-  // if (curs == MEASDATALENGTH - 1) {
-  //   cycled = true;
-  //   curs = 0;
-  // } else {
-  //   curs++;
-  // }
-
-  // recalc min/max if needed
-  // if (recalcMin) {
-  //   recalcRange = true;
-  //   recalculateMin();
-  // }
-  // if (recalcMax) {
-  //   recalcRange = true;
-  //   recalculateMax();
-  // }
-  // if (recalcMin || recalcMax || recalcRange) {
-  //   recalculateRange();
-  // }
-
   recalcMinMaxRange();
 }
-
-// void recalculateMin() {
-//   measMin = INT32_MAX;
-//   byte i = cycled ? (curs + 1) : 0;
-//   for (;; i++) {
-//     if (i == MEASDATALENGTH) i = 0;
-//     if (i == curs) break;
-//     if (getTemp(i) < measMin) {
-//       measMin = getTemp(i);
-//       measMinInd = i;
-//     }
-//   }
-// }
-// void recalculateMax() {
-//   measMax = (float)INT32_MIN;
-//   byte i = cycled ? (curs + 1) : 0;
-//   for (;; i++) {
-//     if (i == MEASDATALENGTH) i = 0;
-//     if (i == curs) break;
-//     if (getTemp(i) > measMax) {
-//       measMax = getTemp(i);
-//       measMaxInd = i;
-//     }
-//   }
-// }
-// void recalculateRange() {
-//   measMin8 = measMin;
-//   int8_t range = (int8_t)measMax - measMin8;  // calculate in bytes for scale to correspond correctly to screen height
-//   if (range >= 1) scale = (float)(DISPLAYDATAHEIGHT - 1 - (GRAPHPADDINGTOP + GRAPHPADDINGBOT)) / range;  // use this for aligning graph vertically to the center
-//   else scale = 2.f;
-// }
 
 void recalcMinMaxRange() {
   // recalc min/max
   measMin = DMAX;
   measMax = DMIN;
-  for (uint16_t i = 0; i < measData.count(); i++) {
+  // only consider visible min/max if not a graph cursor mode
+  for (uint16_t i = graphCursMode ? 0 : max(0, (int16_t)measData.count() - SCREEN_WIDTH); i < measData.count(); i++) {
     float t = getTemp(i);
     if (t < measMin) measMin = t;
     if (t > measMax) measMax = t;
   }
   // recalc scale for graph
-  // TODO: work through this and optimize!
-  measMin8 = measMin;
-  int8_t range = (int8_t)measMax - measMin8;  // calculate in bytes for scale to correspond correctly to screen height
-  if (range >= 1) scale = (float)(DISPLAYDATAHEIGHT - 1 - (GRAPHPADDINGTOP + GRAPHPADDINGBOT)) / range;  // use this for aligning graph vertically to the center
+  float range = measMax - measMin;
+  if (range >= 1) scale = (DISPLAYDATAHEIGHT - 1 - (GRAPHPADDINGTOP + GRAPHPADDINGBOT)) / range;  // use this for aligning graph vertically to the center
   else scale = 2.f;
 }
 
@@ -1227,7 +1151,6 @@ void recalcMinMaxRange() {
 // idx = {0 ... measData.count()-1}
 float getTemp(const uint16_t idx) {
     // returns degrees of Celsium
-    // uint8_t temp = measArr->get(idx);
     uint8_t temp = measData.get(idx);
     return (float)temp * MP_RANGE / MP_CAPN + MP_MIN;
 }
@@ -1235,7 +1158,6 @@ void pushTemp(float temp) {
     // takes degrees of Celsium
     float tShifted = constrain(temp, MP_MIN, MP_MAX) - MP_MIN;
     uint8_t tMeas = (uint8_t)(tShifted * MP_CAPN / MP_RANGE);
-    // measArr->put(idx, tMeas);
     measData.push(tMeas);
 }
 

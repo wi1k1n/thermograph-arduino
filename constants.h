@@ -1,12 +1,12 @@
 // Main constants
 #define TEMPAVERAGEN 20  // [0..63] - number of intermediate measurements
 // #define MEASDATALENGTH 80  // bigger than min(SCREEN_WIDTH, 254) is not supported yet!
-#define MEASDATABYTELENGTH 80  // number of bytes to allocate (final available length: MEASDATABYTELENGTH * 8 / MP_CAP)
+#define MEASDATABYTELENGTH 64  // number of bytes to allocate (final available length: MEASDATABYTELENGTH * 8 / MP_CAP)
 
 // Manual precision constants
-#define MP_CAP 4  // manual precision capacity: {3, 4, 5, 6, 7, 8}
-#define MP_MIN 17  // manual precision minimum: {-61 ... 127}
-#define MP_MAX 32  // manual precision maximum: {-56 ... 132}
+#define MP_CAP 4  // manual precision capacity: {2, 3, 4, 5, 6, 7, 8}
+#define MP_MIN 13  // manual precision minimum: {-61 ... 127}
+#define MP_MAX 37  // manual precision maximum: {-56 ... 132}
 #define MP_RANGE (MP_MAX-MP_MIN)
 #define MP_CAPN (0xFF >> (8 - MP_CAP))  // max number of different values using MP_CAP bits
 

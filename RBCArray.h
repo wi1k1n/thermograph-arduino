@@ -16,6 +16,11 @@ class RBCArray: public BCArray {
         void clear();  // lazily clears data
 
         uint16_t count();  // the exact number of stored values
+
+        uint16_t cursor();  // return current cursor value
+        boolean cycled();  // return current cycled value
+        void setCycled(boolean cycl);
+        void setCursor(uint16_t curs);
     private:
         uint16_t _cursor = 0;
         boolean _cycled = false;
@@ -63,4 +68,16 @@ uint16_t RBCArray::count() {
     return _cycled ? length() : _cursor;
 }
 
+uint16_t RBCArray::cursor() {
+    return _cursor;
+}
+boolean RBCArray::cycled() {
+    return _cycled;
+}
+void RBCArray::setCycled(boolean cycl) {
+    _cycled = cycl;
+}
+void RBCArray::setCursor(uint16_t curs) {
+    _cursor = curs;
+}
 #endif // RBCARRAY_H

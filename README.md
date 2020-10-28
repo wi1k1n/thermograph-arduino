@@ -56,9 +56,13 @@ Hold RIGHT button to exit SETTINGS screen.
     - Display lib takes ~200 bytes of SRAM (+1KB is allocated dynamically on Heap)
     - Timers don't need all the internal variables (now each takes 13 bytes => 65 bytes in total)
     - Each GButton take ~23 bytes (could be less?), so ~46 bytes in total
+    - use int16_t (100 times bigger, for .xx precision) instead of floats for measMin(G)/measMax(G) & tempValPartAverage
 - Optimize flash usage
     - remove adafruit splash logo
 - [Pause] button
+- Prettier USB mode display text
+- Tiny scale on graph cursor mode (for visual navigation, when exploring a lot of same values)
+- getter/setter in RBCArray class
 
 ## Known bugs
 
