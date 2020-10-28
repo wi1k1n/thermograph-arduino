@@ -8,7 +8,7 @@
 #include "constants.h"
 #include "logo.h"
 #include "util.h"
-#include "termData.h"
+#include "RBCArray.h"
 
 #define PGM_READ_CHARARR(val) (char*)pgm_read_word(&val)
 
@@ -32,7 +32,7 @@ byte tempValN = 0;  // number of currently got measurements
 
 // measurements and display graph variables
 // BCArray* measArr = new BCArray(MP_CAP, MEASDATALENGTH);
-RBCArray_o measData(MEASDATABYTELENGTH, MP_CAP);
+RBCArray measData(MEASDATABYTELENGTH, MP_CAP);
 
 byte curs = 0;
 bool cycled = false;
