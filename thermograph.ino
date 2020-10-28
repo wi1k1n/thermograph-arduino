@@ -8,6 +8,7 @@
 #include "constants.h"
 #include "logo.h"
 #include "util.h"
+#include "termData.h"
 
 #define PGM_READ_CHARARR(val) (char*)pgm_read_word(&val)
 
@@ -30,8 +31,8 @@ float tempValPartAverage;  // partially averaged value of analogRead(thermistor)
 byte tempValN = 0;  // number of currently got measurements
 
 // measurements and display graph variables
-int8_t measData[1];
-BCArray* measArr = new BCArray(MP_CAP, MEASDATALENGTH);
+// BCArray* measArr = new BCArray(MP_CAP, MEASDATALENGTH);
+RBCArray_o measData(MEASDATABYTELENGTH, MP_CAP);
 
 byte curs = 0;
 bool cycled = false;
@@ -40,8 +41,8 @@ float measMax = INT32_MIN;
 float measMinG = INT32_MAX;
 float measMaxG = INT32_MIN;
 int8_t measMin8 = INT8_MAX;
-byte measMinInd = 0;
-byte measMaxInd = 0;
+// int16_t measMinInd = 0;
+// int16_t measMaxInd = 0;
 
 bool measChanged = true;
 float scale = 2.f;
@@ -65,7 +66,7 @@ const uint16_t PROGMEM settingsOptsGraphValsMSMask = 0b1100000000000001;  // 1 i
 #define SETTINGSOPTSGRAPHSIZE 15  // no more than 16!
 byte settingsOptsGraphCur = 1;
 
-// graphCurs > MEASDATALENGTH  ==>  graphCurs is not active
+// graphCurs > measData.length()  ==>  graphCurs is not active
 byte graphCurs = 255;
 byte graphCursSteps = 0;
 
@@ -111,6 +112,7 @@ void loop() {
   if (timerStoreTemp.isReady()) {
     // Serial.println(F("store timer ready"));
     storeMeasurement();
+    // send temp over Serial if USB mode is ON
     if (updateMeasurementUSB) {
       uart.println(computeTemp(tempValPartAverage));
     }
@@ -122,12 +124,12 @@ void loop() {
       // if graph screen
       if (menuScreen == MENUGRAPH) {
         // graphCursor mode active
-        if (graphCurs < MEASDATALENGTH) {
+        if (graphCurs < measData.length()) {
           if (!btnR.isHold()) {
             graphCursorMove(-1);
             forceMenuRedraw = true;
           }
-        } else {}
+        }
       }
     }
   }
@@ -136,7 +138,7 @@ void loop() {
     if (!displayWakeUp()) {
       if (menuScreen == MENUGRAPH) {
         // graphCursor mode active
-        if (graphCurs < MEASDATALENGTH) {
+        if (graphCurs < measData.length()) {
           if (!btnL.isHold()) {
             graphCursorMove(1);
             forceMenuRedraw = true;
@@ -177,7 +179,7 @@ void loop() {
       changeMenuScreen(MENUGRAPH);
     } else if (menuScreen == MENUGRAPH) {
       // graphCursor mode not active
-      if (graphCurs >= MEASDATALENGTH) {
+      if (graphCurs >= measData.length()) {
         changeMenuScreen(MENULIVE);
       }
     }
@@ -202,15 +204,15 @@ void loop() {
     if (menuScreen == MENUGRAPH) {
       graphCursSteps = 0;
       // if graphCursor mode not active
-      if (graphCurs >= MEASDATALENGTH) {
-        graphCurs = curs;
+      if (graphCurs >= measData.length()) {
+        // graphCurs = curs;
         btnL.resetStates();
       }
     }
     // if settings screen
     else if (menuScreen == MENUSETTINGS) {
       if (displayEnabled) {
-        settingsHoldAction();
+        settingsHoldAction(); //CURS
         timeoutSaveLastMenu.start();
       } else {
         endSerialUSB();
@@ -225,7 +227,7 @@ void loop() {
     } else if (menuScreen == MENUGRAPH) {
       graphCursSteps = 0;  // set g-cursor steps to 0 (after them the speed is bigger when holding)
       // if not in graph cursor mode
-      if (graphCurs >= MEASDATALENGTH) {
+      if (graphCurs >= measData.length()) {
         // save current menu screen to restore exactly to it later
         menuScreenLast = menuScreen;
         changeMenuScreen(MENUSETTINGS);
@@ -276,7 +278,7 @@ void loop() {
       // if on graph screen
       if (menuScreen == MENUGRAPH) {
         // if graphCursor mode is active
-        if (graphCurs < MEASDATALENGTH) {
+        if (graphCurs < measData.length()) {
           // Serial.println(btnL.getHoldClicks());
           graphCursorMove(++graphCursSteps < GRAPHBTNSTEPS4SPEED ? -1 : -GRAPHBTNSPEED);
           forceMenuRedraw = true;
@@ -290,7 +292,7 @@ void loop() {
       // if on graph screen
       if (menuScreen == MENUGRAPH) {
         // if graphCursor mode is active
-        if (graphCurs < MEASDATALENGTH) {
+        if (graphCurs < measData.length()) {
           graphCursorMove(++graphCursSteps < GRAPHBTNSTEPS4SPEED ? 1 : GRAPHBTNSPEED);
           forceMenuRedraw = true;
         }
@@ -302,7 +304,7 @@ void loop() {
     // if on graph screen
     if (menuScreen == MENUGRAPH) {
       // if graphCursor mode is active
-      if (graphCurs < MEASDATALENGTH) {
+      if (graphCurs < measData.length()) {
         graphCurs = 255;
         forceMenuRedraw = true;
       }
@@ -328,26 +330,28 @@ void loop() {
   }
 
   // receive commands via USB
-  if (!displayEnabled) {
+  if (!displayEnabled) { //CURS
     if (uart.available()) {
       byte cmd = uart.read();
       // send data from meas[]
       if (cmd == USBCMD_SENDDATA) {
-        uart.print(timerStoreTemp.getInterval());
-        uart.print(' ');
-        uint8_t i = cycled ? curs : 0;  // uint16_t for MEGA
-        for (;;) {
-          uart.print(getTemp(i));
-          i++;
-          if (i == measArr->length()) i = 0;  // wrap around i
-          if (i == curs) break;  // stop condition
-          uart.print(',');
-        }
-        uart.print('\r');
-        uart.print('\n');
+        uart.print("NOTIMPLEMENTED");
+        // uart.print(timerStoreTemp.getInterval());
+        // uart.print(' ');
+        // uint8_t i = cycled ? curs : 0;  // uint16_t for MEGA
+        // for (;;) {
+        //   uart.print(getTemp(i));
+        //   i++;
+        //   if (i == measArr->length()) i = 0;  // wrap around i
+        //   if (i == curs) break;  // stop condition
+        //   uart.print(',');
+        // }
+        // uart.print('\r');
+        // uart.print('\n');
       }
       // send content of eeprom
       else if (cmd == USBCMD_SENDEEPROM) {
+        uart.print("NOTIMPLEMENTED");
         // uint16_t indOfStart, dataLength;
         // int8_t mpmin, mpmax;
         // uint8_t mpcap;
@@ -525,50 +529,116 @@ void incrementSettingSelected(const int8_t &dir) {
 
 // remove stored data
 void onButtonReset() {
-    curs = 0;
-    cycled = false;
+    // curs = 0;
+    // cycled = false;
+    measData.clear();
     measChanged = true;
-    measMin = INT32_MAX;
-    measMax = INT32_MIN;
-    measMinG = INT32_MAX;
-    measMaxG = INT32_MIN;
-    measMin8 = INT8_MAX;
-    measMinInd = 0;
-    measMaxInd = 0;
+    measMin = DMAX;
+    measMax = DMIN;
+    measMinG = DMAX;
+    measMaxG = DMIN;
+    measMin8 = DMAX;
+    // measMinInd = 0;
+    // measMaxInd = 0;
     scale = 2.f;
     measurePartial();
     setStoreTempTimer();
 }
 // save stored data to eeprom
 void onButtonSave() {
-  // first 7 bytes of eeprom contain service info
-  uint16_t indOfStart, dataLength, dataCurs;
-  int8_t mpmin, mpmax;
-  uint8_t mpcap;
-  boolean cycl;
-  eepromGetIndLen(indOfStart, dataLength, mpmin, mpmax, mpcap, dataCurs, cycl);
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(100);
+  digitalWrite(LED_BUILTIN, LOW);
+  return;
+  // // first 7 bytes of eeprom contain service info
+  // uint16_t indOfStart, dataLength, dataCurs;
+  // int8_t mpmin, mpmax;
+  // uint8_t mpcap;
+  // boolean cycl;
+  // eepromGetIndLen(indOfStart, dataLength, mpmin, mpmax, mpcap, dataCurs, cycl);
 
-  // display->setCursor(0, 0);
-  // display->print(indOfStart);
-  // display->print(' ');
-  // display->print(dataLength);
-  // display->print(' ');
-  // display->print(dataCurs);
-  // display->setCursor(0, 8);
-  // display->print(mpmin);
-  // display->print(' ');
-  // display->print(mpmax);
-  // display->print(' ');
-  // display->print(mpcap);
-  // display->print(' ');
-  // display->print(cycl);
-  // display->display();
+  // // display->setCursor(0, 0);
+  // // display->print(indOfStart);
+  // // display->print(' ');
+  // // display->print(dataLength);
+  // // display->print(' ');
+  // // display->print(dataCurs);
+  // // display->setCursor(0, 8);
+  // // display->print(mpmin);
+  // // display->print(' ');
+  // // display->print(mpmax);
+  // // display->print(' ');
+  // // display->print(mpcap);
+  // // display->print(' ');
+  // // display->print(cycl);
+  // // display->display();
 
-  // return;
+  // // return;
 
-  // validate and "constrain"
-  // first 7 bytes and last 2 bytes are reserved as service storage
-  if (indOfStart < EEPROMDATASTARTINDEX || indOfStart >= EEPROMDATAENDINDEX) indOfStart = EEPROMDATASTARTINDEX;
+  // // validate and "constrain"
+  // // first 7 bytes and last 2 bytes are reserved as service storage
+  // if (indOfStart < EEPROMDATASTARTINDEX || indOfStart >= EEPROMDATAENDINDEX) indOfStart = EEPROMDATASTARTINDEX;
+  // // mpmin = constrain(mpmin, DMIN, DMAX);
+  // // mpmax = constrain(mpmax, DMIN, DMAX);
+  // // if (mpmax - mpmin < 1) {
+  // //   mpmax = mpmin;
+  // //   if (mpmax >= 127) mpmin = 126;
+  // //   else mpmax = mpmin + 1;
+  // // }
+  // // mpcap = constrain(mpcap, 2, 8);
+  // if ((uint16_t)ceil(dataLength * mpcap / 8.f) > EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX)
+  //   dataLength = (uint16_t)ceil((EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX) * 8.f / mpcap);
+  // if (dataCurs >= dataLength) dataCurs = 0;
+  
+  // // calculate start index for current saving (for reducing eeprom wear)
+  // uint32_t eepromStart = indOfStart + (uint16_t)ceil(dataLength * mpcap / 8.f);
+  // if (eepromStart >= EEPROMDATAENDINDEX)
+  //   eepromStart -= EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX;  // wrap cursor around
+
+
+  // // dbg_begin();
+  // // uart.println();
+  // // TODO!!!! eepromCurs = 7;
+  // // put measured data to eeprom byte-by-byte
+  // uint16_t eepromCurs = eepromStart;
+  // uint16_t iStopInd = (uint16_t)ceil((cycled ? measArr->byteLength() : curs) * MP_CAP / 8.f);
+  // // uart.println(eepromCurs);
+  // // uart.println(iStopInd);
+  // // uart.println(curs);
+  // // uart.println();
+  // for (uint8_t i = 0;; i++, eepromCurs++) {  // uint16_t for MEGA
+  //   if (i == iStopInd) break;  // stop condition
+  //   if (eepromCurs >= EEPROMDATAENDINDEX) eepromCurs = EEPROMDATASTARTINDEX;
+  //   EEPROM.put(eepromCurs, measArr->byteArray()[i]);
+  //   // uart.println(measArr->byteArray()[i]);
+  // }
+
+  // // uart.println();
+  // // uart.println(eepromCurs);
+  // // delay(100);
+  // // dbg_end();
+
+  // // update service bytes
+  // eepromPutIndLen(eepromStart, cycled ? measArr->byteLength() : curs, MP_MIN, MP_MAX, MP_CAP, curs, cycled);
+}
+// load data from eeprom
+void onButtonLoad() {
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(100);
+  digitalWrite(LED_BUILTIN, LOW);
+  return;
+
+  // // load service information from eeprom
+  // uint16_t indOfStart, dataLength, dataCurs;
+  // int8_t mpmin, mpmax;
+  // uint8_t mpcap;
+  // boolean cycl;
+  // eepromGetIndLen(indOfStart, dataLength, mpmin, mpmax, mpcap, dataCurs, cycl);
+
+  // // validate and "constrain"
+  // if (indOfStart < EEPROMDATASTARTINDEX || indOfStart >= EEPROMDATAENDINDEX) indOfStart = EEPROMDATASTARTINDEX;
   // mpmin = constrain(mpmin, DMIN, DMAX);
   // mpmax = constrain(mpmax, DMIN, DMAX);
   // if (mpmax - mpmin < 1) {
@@ -577,107 +647,55 @@ void onButtonSave() {
   //   else mpmax = mpmin + 1;
   // }
   // mpcap = constrain(mpcap, 2, 8);
-  if ((uint16_t)ceil(dataLength * mpcap / 8.f) > EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX)
-    dataLength = (uint16_t)ceil((EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX) * 8.f / mpcap);
-  if (dataCurs >= dataLength) dataCurs = 0;
+  // if ((uint16_t)ceil(dataLength * mpcap / 8.f) > EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX)
+  //   dataLength = (uint16_t)((EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX) * 8 / mpcap);
+  // if (dataCurs >= measArr->length()) dataCurs = 0;
+
+  // // dbg_begin();
+  // // uart.println();
+  // // uart.println(indOfStart);
+  // // uart.println();
+
+  // // indOfStart = 7;
+  // // load measurements byte-by-byte
+  // for (uint8_t i = 0; i < dataLength; i++, indOfStart++) {  // uint16_t for MEGA
+  //   if (indOfStart >= EEPROMDATAENDINDEX) indOfStart = EEPROMDATAENDINDEX;
+  //   EEPROM.get(indOfStart, measArr->byteArray()[i]);
+  //   // uart.println(measArr->byteArray()[i]);
+  // }
+  // cycled = cycl;
+  // curs = dataCurs;
   
-  // calculate start index for current saving (for reducing eeprom wear)
-  uint32_t eepromStart = indOfStart + (uint16_t)ceil(dataLength * mpcap / 8.f);
-  if (eepromStart >= EEPROMDATAENDINDEX)
-    eepromStart -= EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX;  // wrap cursor around
+  // // uart.println();
+  // // uart.println((int)indOfStart);
+  // // delay(100);
+  // // dbg_end();
 
+  // //TODO: mpmin/mpmax should be considered here
 
-  // dbg_begin();
-  // uart.println();
-  // TODO!!!! eepromCurs = 7;
-  // put measured data to eeprom byte-by-byte
-  uint16_t eepromCurs = eepromStart;
-  uint16_t iStopInd = (uint16_t)ceil((cycled ? measArr->byteLength() : curs) * MP_CAP / 8.f);
-  // uart.println(eepromCurs);
-  // uart.println(iStopInd);
-  // uart.println(curs);
-  // uart.println();
-  for (uint8_t i = 0;; i++, eepromCurs++) {  // uint16_t for MEGA
-    if (i == iStopInd) break;  // stop condition
-    if (eepromCurs >= EEPROMDATAENDINDEX) eepromCurs = EEPROMDATASTARTINDEX;
-    EEPROM.put(eepromCurs, measArr->byteArray()[i]);
-    // uart.println(measArr->byteArray()[i]);
-  }
+  // // display->setCursor(0, 0);
+  // // display->setTextColor(SSD1306_WHITE);
+  // // display->setTextSize(1);
 
-  // uart.println();
-  // uart.println(eepromCurs);
-  // delay(100);
-  // dbg_end();
+  // // display->print(measMin);
+  // // display->print(' ');
 
-  // update service bytes
-  eepromPutIndLen(eepromStart, cycled ? measArr->byteLength() : curs, MP_MIN, MP_MAX, MP_CAP, curs, cycled);
-}
-// load data from eeprom
-void onButtonLoad() {
-  // load service information from eeprom
-  uint16_t indOfStart, dataLength, dataCurs;
-  int8_t mpmin, mpmax;
-  uint8_t mpcap;
-  boolean cycl;
-  eepromGetIndLen(indOfStart, dataLength, mpmin, mpmax, mpcap, dataCurs, cycl);
+  // // recalculateMin();
+  // // recalculateMax();
+  // // recalculateRange();
+  // recalcMinMaxRange();
 
-  // validate and "constrain"
-  if (indOfStart < EEPROMDATASTARTINDEX || indOfStart >= EEPROMDATAENDINDEX) indOfStart = EEPROMDATASTARTINDEX;
-  mpmin = constrain(mpmin, DMIN, DMAX);
-  mpmax = constrain(mpmax, DMIN, DMAX);
-  if (mpmax - mpmin < 1) {
-    mpmax = mpmin;
-    if (mpmax >= 127) mpmin = 126;
-    else mpmax = mpmin + 1;
-  }
-  mpcap = constrain(mpcap, 2, 8);
-  if ((uint16_t)ceil(dataLength * mpcap / 8.f) > EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX)
-    dataLength = (uint16_t)((EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX) * 8 / mpcap);
-  if (dataCurs >= measArr->length()) dataCurs = 0;
+  // if (measMin < measMinG) measMinG = measMin;
+  // if (measMax > measMaxG) measMaxG = measMax;
 
-  // dbg_begin();
-  // uart.println();
-  // uart.println(indOfStart);
-  // uart.println();
+  // // display->print(measMin);
+  // // display->display();
 
-  // indOfStart = 7;
-  // load measurements byte-by-byte
-  for (uint8_t i = 0; i < dataLength; i++, indOfStart++) {  // uint16_t for MEGA
-    if (indOfStart >= EEPROMDATAENDINDEX) indOfStart = EEPROMDATAENDINDEX;
-    EEPROM.get(indOfStart, measArr->byteArray()[i]);
-    // uart.println(measArr->byteArray()[i]);
-  }
-  cycled = cycl;
-  curs = dataCurs;
+  // // delay(1000);
   
-  // uart.println();
-  // uart.println((int)indOfStart);
-  // delay(100);
-  // dbg_end();
-
-  //TODO: mpmin/mpmax should be considered here
-
-  // display->setCursor(0, 0);
-  // display->setTextColor(SSD1306_WHITE);
-  // display->setTextSize(1);
-
-  // display->print(measMin);
-  // display->print(' ');
-
-  recalculateMin();
-  recalculateMax();
-  recalculateRange();
-  if (measMin < measMinG) measMinG = measMin;
-  if (measMax > measMaxG) measMaxG = measMax;
-
-  // display->print(measMin);
-  // display->display();
-
-  // delay(1000);
-  
-  tempValPartAverage = 0;
-  tempValN = 0;
-  measurePartial();
+  // tempValPartAverage = 0;
+  // tempValN = 0;
+  // measurePartial();
 }
 // reads eepromCursor and dataLength from eeprom
 void eepromGetIndLen(uint16_t &ind,
@@ -866,7 +884,7 @@ void displayGraph() {
   /* === draw caption === */
   if (timerShowTemp.isReady() || forceMenuRedraw) {
     // only draw this caption if graphCursor mode is inactive
-    if (graphCurs >= MEASDATALENGTH) {
+    if (graphCurs >= measData.length()) {
       display->fillRect(0, 0, SCREEN_WIDTH, DISPLAYPADDINGTOP, SSD1306_BLACK);
 
       display->setCursor(0, 0);
@@ -876,7 +894,7 @@ void displayGraph() {
       dtostrf(computeTemp(tempValPartAverage), 6, 2, tempStrBuf);
       display->print(tempStrBuf);
       // do not show min/max until first storage iteration updates its default values
-      if (cycled || curs > 0) {
+      if (measData.count() > 0) {
         display->print(" ");
         byte curX = display->getCursorX();
         display->print("l:");
@@ -902,15 +920,25 @@ void displayGraph() {
     measChanged = false;
     display->fillRect(0, DISPLAYPADDINGTOP, SCREEN_WIDTH, DISPLAYDATAHEIGHT, SSD1306_BLACK);
 
-    // i iterates from 0 to cursor (or from cursor+1 up to cursor, wrapping around the MEASDATALENGTH)
-    byte i = cycled ? (curs + 1) : 0;
+    // // i iterates from 0 to cursor (or from cursor+1 up to cursor, wrapping around the MEASDATALENGTH)
+    // byte i = cycled ? (curs + 1) : 0;
+    // byte prevX = 0;
+    // // constrain is needed to correctly fit into screen
+    // byte prevY = SCREEN_HEIGHT - GRAPHPADDINGBOT - ((int8_t)getTemp((i < MEASDATALENGTH ? i : 0)) - measMin8) * scale;
+    // for (byte x = 1;; i++, x++) {
+    //   if (i == MEASDATALENGTH) i = 0;  // wrap around i
+    //   if (i == curs) break;  // stop condition
+    //   byte y = SCREEN_HEIGHT - GRAPHPADDINGBOT - ((int8_t)getTemp(i) - measMin8) * scale;
+    //   display->drawLine(prevX, prevY, x, y, SSD1306_WHITE);
+    //   prevX = x;
+    //   prevY = y;
+    // }
+
+    // TODO: make it work for the storage bigger than SCREEN_WIDTH
     byte prevX = 0;
-    // constrain is needed to correctly fit into screen
-    byte prevY = SCREEN_HEIGHT - GRAPHPADDINGBOT - ((int8_t)getTemp((i < MEASDATALENGTH ? i : 0)) - measMin8) * scale;
-    for (byte x = 1;; i++, x++) {
-      if (i == MEASDATALENGTH) i = 0;  // wrap around i
-      if (i == curs) break;  // stop condition
-      byte y = SCREEN_HEIGHT - GRAPHPADDINGBOT - ((int8_t)getTemp(i) - measMin8) * scale;
+    byte prevY = SCREEN_HEIGHT - GRAPHPADDINGBOT - ((int8_t)getTemp(0) - measMin8) * scale;
+    for (uint8_t i = 0, x = 0; i < measData.count(); i++, x++) {
+      uint8_t y = SCREEN_HEIGHT - GRAPHPADDINGBOT - ((int8_t)getTemp(i) - measMin8) * scale;
       display->drawLine(prevX, prevY, x, y, SSD1306_WHITE);
       prevX = x;
       prevY = y;
@@ -918,29 +946,29 @@ void displayGraph() {
   }
 
   /* === draw cursor === */
-  if (graphCurs < MEASDATALENGTH) {
-    display->drawLine(graphCurs, DISPLAYPADDINGTOP, graphCurs, SCREEN_HEIGHT, SSD1306_WHITE);
+  if (graphCurs < measData.length()) {
+    // display->drawLine(graphCurs, DISPLAYPADDINGTOP, graphCurs, SCREEN_HEIGHT, SSD1306_WHITE);
     
     
     display->fillRect(0, 0, SCREEN_WIDTH, DISPLAYPADDINGTOP, SSD1306_BLACK);
-    // draw current X position as -time
-    int16_t curBackTime = (cycled ? MEASDATALENGTH : (curs + 1)) - graphCurs;
-    if (curBackTime > 0) {
-      display->setCursor(0, 0);
-      display->setTextColor(SSD1306_WHITE);  // Draw white text
-      display->setTextSize(1);
+    // // draw current X position as -time
+    // int16_t curBackTime = (cycled ? MEASDATALENGTH : (curs + 1)) - graphCurs;
+    // if (curBackTime > 0) {
+    //   display->setCursor(0, 0);
+    //   display->setTextColor(SSD1306_WHITE);  // Draw white text
+    //   display->setTextSize(1);
 
-      formatBackTime(curBackTime * timerStoreTemp.getInterval(), tempStrBuf, 1);
-      if (curBackTime > 0) display->print('-');
-      display->print(tempStrBuf[1]);
-      display->print(tempStrBuf[2]);
-      display->print(tempStrBuf[3]);
-      display->print(tempStrBuf[4]);
+    //   formatBackTime(curBackTime * timerStoreTemp.getInterval(), tempStrBuf, 1);
+    //   if (curBackTime > 0) display->print('-');
+    //   display->print(tempStrBuf[1]);
+    //   display->print(tempStrBuf[2]);
+    //   display->print(tempStrBuf[3]);
+    //   display->print(tempStrBuf[4]);
       
-      display->setCursor(display->getCursorX() + 8, 0);
-      dtostrf(getTemp(cycled ? ((curs + graphCurs) % MEASDATALENGTH) : (graphCurs - 1)), 6, 2, tempStrBuf);
-      display->print(tempStrBuf);
-    }
+    //   display->setCursor(display->getCursorX() + 8, 0);
+    //   dtostrf(getTemp(cycled ? ((curs + graphCurs) % MEASDATALENGTH) : (graphCurs - 1)), 6, 2, tempStrBuf);
+    //   display->print(tempStrBuf);
+    // }
   }
 
   forceMenuRedraw = false;
@@ -948,8 +976,8 @@ void displayGraph() {
 }
 void graphCursorMove(const int8_t dir) {
   if ((int8_t)graphCurs + dir < 0)
-    graphCurs = MEASDATALENGTH - 1;
-  else if ((int8_t)graphCurs + dir >= MEASDATALENGTH)
+    graphCurs = measData.length() - 1;
+  else if ((int8_t)graphCurs + dir >= measData.length())
     graphCurs = 0;
   else graphCurs += dir;
 }
@@ -988,10 +1016,7 @@ void displaySettings() {
       display->setTextColor(SSD1306_WHITE, SSD1306_BLACK);
 
       display->print(F("Max storage: "));
-      formatBackTime(MEASDATALENGTH * getStoreTempTimerInterval(settingsOptsGraphCur), tempStrBuf, 0);
-      // Serial.print(tempStrBuf);
-      // Serial.print(" <- ");
-      // Serial.println(MEASDATALENGTH * getStoreTempTimerInterval(settingsOptsGraphCur));
+      formatBackTime(measData.length() * getStoreTempTimerInterval(settingsOptsGraphCur), tempStrBuf, 0);
       display->print(tempStrBuf[0]);
       display->print(tempStrBuf[1]);
       display->print(tempStrBuf[2]);
@@ -1049,79 +1074,99 @@ void storeMeasurement() {
   tempValN = 0;
   measurePartial();
   
-  // check, if are going to overrid min or max value
-  bool recalcMin = curs == measMinInd;
-  bool recalcMax = curs == measMaxInd;
-  bool recalcRange = false;
+  // check, if are going to override min or max value
+  // bool recalcMin = curs == measMinInd;
+  // bool recalcMax = curs == measMaxInd;
+  // bool recalcRange = false;
   
   // update min/max and scale variables
-  if (temp < measMin) {
-    measMin = temp;
-    measMinInd = curs;
-    recalcMin = false;
-    recalcRange = true;
-  }
-  if (temp > measMax) {
-    measMax = temp;
-    measMaxInd = curs;
-    recalcMax = false;
-    recalcRange = true;
-  }
+  // if (temp < measMin) {
+  //   measMin = temp;
+  //   measMinInd = curs;
+  //   recalcMin = false;
+  //   recalcRange = true;
+  // }
+  // if (temp > measMax) {
+  //   measMax = temp;
+  //   measMaxInd = curs;
+  //   recalcMax = false;
+  //   recalcRange = true;
+  // }
   // update global min/max
   if (temp < measMinG) measMinG = temp;
   if (temp > measMaxG) measMaxG = temp;
 
   // store
-  putTemp(curs, temp);
+  pushTemp(temp);
+  measChanged = true;
 
   // increment curs
-  measChanged = true;
-  if (curs == MEASDATALENGTH - 1) {
-    cycled = true;
-    curs = 0;
-  } else {
-    curs++;
-  }
+  // measChanged = true;
+  // if (curs == MEASDATALENGTH - 1) {
+  //   cycled = true;
+  //   curs = 0;
+  // } else {
+  //   curs++;
+  // }
 
   // recalc min/max if needed
-  if (recalcMin) {
-    recalcRange = true;
-    recalculateMin();
-  }
-  if (recalcMax) {
-    recalcRange = true;
-    recalculateMax();
-  }
-  if (recalcMin || recalcMax || recalcRange) {
-    recalculateRange();
-  }
+  // if (recalcMin) {
+  //   recalcRange = true;
+  //   recalculateMin();
+  // }
+  // if (recalcMax) {
+  //   recalcRange = true;
+  //   recalculateMax();
+  // }
+  // if (recalcMin || recalcMax || recalcRange) {
+  //   recalculateRange();
+  // }
+
+  recalcMinMaxRange();
 }
 
-void recalculateMin() {
-  measMin = INT32_MAX;
-  byte i = cycled ? (curs + 1) : 0;
-  for (;; i++) {
-    if (i == MEASDATALENGTH) i = 0;
-    if (i == curs) break;
-    if (getTemp(i) < measMin) {
-      measMin = getTemp(i);
-      measMinInd = i;
-    }
+// void recalculateMin() {
+//   measMin = INT32_MAX;
+//   byte i = cycled ? (curs + 1) : 0;
+//   for (;; i++) {
+//     if (i == MEASDATALENGTH) i = 0;
+//     if (i == curs) break;
+//     if (getTemp(i) < measMin) {
+//       measMin = getTemp(i);
+//       measMinInd = i;
+//     }
+//   }
+// }
+// void recalculateMax() {
+//   measMax = (float)INT32_MIN;
+//   byte i = cycled ? (curs + 1) : 0;
+//   for (;; i++) {
+//     if (i == MEASDATALENGTH) i = 0;
+//     if (i == curs) break;
+//     if (getTemp(i) > measMax) {
+//       measMax = getTemp(i);
+//       measMaxInd = i;
+//     }
+//   }
+// }
+// void recalculateRange() {
+//   measMin8 = measMin;
+//   int8_t range = (int8_t)measMax - measMin8;  // calculate in bytes for scale to correspond correctly to screen height
+//   if (range >= 1) scale = (float)(DISPLAYDATAHEIGHT - 1 - (GRAPHPADDINGTOP + GRAPHPADDINGBOT)) / range;  // use this for aligning graph vertically to the center
+//   else scale = 2.f;
+// }
+
+void recalcMinMaxRange() {
+  // recalc min/max
+  measMin = DMAX;
+  measMax = DMIN;
+  for (uint16_t i = 0; i < measData.count(); i++) {
+    float t = getTemp(i);
+    if (t < measMin) measMin = t;
+    if (t > measMax) measMax = t;
   }
-}
-void recalculateMax() {
-  measMax = (float)INT32_MIN;
-  byte i = cycled ? (curs + 1) : 0;
-  for (;; i++) {
-    if (i == MEASDATALENGTH) i = 0;
-    if (i == curs) break;
-    if (getTemp(i) > measMax) {
-      measMax = getTemp(i);
-      measMaxInd = i;
-    }
-  }
-}
-void recalculateRange() {
+  // recalc scale for graph
+  // TODO: work through this and optimize!
   measMin8 = measMin;
   int8_t range = (int8_t)measMax - measMin8;  // calculate in bytes for scale to correspond correctly to screen height
   if (range >= 1) scale = (float)(DISPLAYDATAHEIGHT - 1 - (GRAPHPADDINGTOP + GRAPHPADDINGBOT)) / range;  // use this for aligning graph vertically to the center
@@ -1130,17 +1175,21 @@ void recalculateRange() {
 
 
 // methods that perform temperature (un)normalization
+// idx = {0 ... measData.count()-1}
 float getTemp(const uint16_t idx) {
     // returns degrees of Celsium
-    uint8_t temp = measArr->get(idx);
+    // uint8_t temp = measArr->get(idx);
+    uint8_t temp = measData.get(idx);
     return (float)temp * MP_RANGE / MP_CAPN + MP_MIN;
 }
-void putTemp(const uint16_t idx, float temp) {
+void pushTemp(float temp) {
     // takes degrees of Celsium
     float tShifted = constrain(temp, MP_MIN, MP_MAX) - MP_MIN;
     uint8_t tMeas = (uint8_t)(tShifted * MP_CAPN / MP_RANGE);
-    measArr->put(idx, tMeas);
+    // measArr->put(idx, tMeas);
+    measData.push(tMeas);
 }
+
 
 
 void dbg_begin() {
