@@ -66,8 +66,8 @@ const uint16_t PROGMEM settingsOptsGraphValsMSMask = 0b1100000000000001;  // 1 i
 #define SETTINGSOPTSGRAPHSIZE 15  // no more than 16!
 byte settingsOptsGraphCur = 1;
 
-// graphCurs > measData.length()  ==>  graphCurs is not active
-byte graphCurs = 255;
+boolean graphCursMode = false;
+byte graphCurs = 0;
 byte graphCursSteps = 0;
 
 // usb-mode
@@ -124,7 +124,7 @@ void loop() {
       // if graph screen
       if (menuScreen == MENUGRAPH) {
         // graphCursor mode active
-        if (graphCurs < measData.length()) {
+        if (graphCursMode) {
           if (!btnR.isHold()) {
             graphCursorMove(-1);
             forceMenuRedraw = true;
@@ -138,7 +138,7 @@ void loop() {
     if (!displayWakeUp()) {
       if (menuScreen == MENUGRAPH) {
         // graphCursor mode active
-        if (graphCurs < measData.length()) {
+        if (graphCursMode) {
           if (!btnL.isHold()) {
             graphCursorMove(1);
             forceMenuRedraw = true;
@@ -154,7 +154,9 @@ void loop() {
       changeMenuScreen(MENUGRAPH);
     }
     else if (menuScreen == MENUGRAPH) {
-      changeMenuScreen(MENULIVE);
+      if (!graphCursMode) {
+        changeMenuScreen(MENULIVE);
+      }
     }
     // if settings screen
     else if (menuScreen == MENUSETTINGS) {
@@ -179,7 +181,7 @@ void loop() {
       changeMenuScreen(MENUGRAPH);
     } else if (menuScreen == MENUGRAPH) {
       // graphCursor mode not active
-      if (graphCurs >= measData.length()) {
+      if (!graphCursMode) {
         changeMenuScreen(MENULIVE);
       }
     }
@@ -202,17 +204,20 @@ void loop() {
   if (btnL.isHolded()) {
     // if graph screen
     if (menuScreen == MENUGRAPH) {
-      graphCursSteps = 0;
-      // if graphCursor mode not active
-      if (graphCurs >= measData.length()) {
+      if (graphCursMode) {
+        graphCursSteps = 0;
+      }
+      // if graphCursor mode NOT active
+      else {
         // graphCurs = curs;
+        graphCursMode = true;
         btnL.resetStates();
       }
     }
     // if settings screen
     else if (menuScreen == MENUSETTINGS) {
       if (displayEnabled) {
-        settingsHoldAction(); //CURS
+        settingsHoldAction();
         timeoutSaveLastMenu.start();
       } else {
         endSerialUSB();
@@ -225,9 +230,11 @@ void loop() {
         menuScreenLast = menuScreen;
         changeMenuScreen(MENUSETTINGS);
     } else if (menuScreen == MENUGRAPH) {
-      graphCursSteps = 0;  // set g-cursor steps to 0 (after them the speed is bigger when holding)
-      // if not in graph cursor mode
-      if (graphCurs >= measData.length()) {
+      if (graphCursMode) {
+        graphCursSteps = 0;  // set g-cursor steps to 0 (after them the speed is bigger when holding)
+      }
+      // if NOT in graph cursor mode
+      else {
         // save current menu screen to restore exactly to it later
         menuScreenLast = menuScreen;
         changeMenuScreen(MENUSETTINGS);
@@ -278,7 +285,7 @@ void loop() {
       // if on graph screen
       if (menuScreen == MENUGRAPH) {
         // if graphCursor mode is active
-        if (graphCurs < measData.length()) {
+        if (graphCursMode) {
           // Serial.println(btnL.getHoldClicks());
           graphCursorMove(++graphCursSteps < GRAPHBTNSTEPS4SPEED ? -1 : -GRAPHBTNSPEED);
           forceMenuRedraw = true;
@@ -292,7 +299,7 @@ void loop() {
       // if on graph screen
       if (menuScreen == MENUGRAPH) {
         // if graphCursor mode is active
-        if (graphCurs < measData.length()) {
+        if (graphCursMode) {
           graphCursorMove(++graphCursSteps < GRAPHBTNSTEPS4SPEED ? 1 : GRAPHBTNSPEED);
           forceMenuRedraw = true;
         }
@@ -304,8 +311,9 @@ void loop() {
     // if on graph screen
     if (menuScreen == MENUGRAPH) {
       // if graphCursor mode is active
-      if (graphCurs < measData.length()) {
-        graphCurs = 255;
+      if (graphCursMode) {
+        // graphCurs = 255;
+        graphCursMode = false;
         forceMenuRedraw = true;
       }
     }
@@ -883,8 +891,8 @@ void displayGraph() {
 
   /* === draw caption === */
   if (timerShowTemp.isReady() || forceMenuRedraw) {
-    // only draw this caption if graphCursor mode is inactive
-    if (graphCurs >= measData.length()) {
+    // only draw this caption if graphCursor mode is NOT active
+    if (!graphCursMode) {
       display->fillRect(0, 0, SCREEN_WIDTH, DISPLAYPADDINGTOP, SSD1306_BLACK);
 
       display->setCursor(0, 0);
@@ -934,10 +942,11 @@ void displayGraph() {
     //   prevY = y;
     // }
 
-    // TODO: make it work for the storage bigger than SCREEN_WIDTH
     byte prevX = 0;
-    byte prevY = SCREEN_HEIGHT - GRAPHPADDINGBOT - ((int8_t)getTemp(0) - measMin8) * scale;
-    for (uint8_t i = 0, x = 0; i < measData.count(); i++, x++) {
+    // i might start from >0, since measData.count() can be bigger, than SCREEN_WIDTH
+    uint16_t i = max(0, (int16_t)measData.count() - SCREEN_WIDTH);
+    byte prevY = SCREEN_HEIGHT - GRAPHPADDINGBOT - ((int8_t)getTemp(i) - measMin8) * scale;
+    for (uint8_t x = 0; i < measData.count(); i++, x++) {
       uint8_t y = SCREEN_HEIGHT - GRAPHPADDINGBOT - ((int8_t)getTemp(i) - measMin8) * scale;
       display->drawLine(prevX, prevY, x, y, SSD1306_WHITE);
       prevX = x;
@@ -946,7 +955,7 @@ void displayGraph() {
   }
 
   /* === draw cursor === */
-  if (graphCurs < measData.length()) {
+  if (graphCursMode) {
     // display->drawLine(graphCurs, DISPLAYPADDINGTOP, graphCurs, SCREEN_HEIGHT, SSD1306_WHITE);
     
     
@@ -974,6 +983,7 @@ void displayGraph() {
   forceMenuRedraw = false;
   display->display();
 }
+// TODO: does not consider that measData.count() can be > SCREEN_WIDTH
 void graphCursorMove(const int8_t dir) {
   if ((int8_t)graphCurs + dir < 0)
     graphCurs = measData.length() - 1;
