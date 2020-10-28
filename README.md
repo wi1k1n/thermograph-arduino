@@ -71,3 +71,5 @@ Hold RIGHT button to exit SETTINGS screen.
 - No time memory (only considers current graph timeout setting, even if the whole graph has been built with different graph timeout)
 - Low memory
 - Holding both buttons does not stop graph cursor from moving
+- Not tested on Mega, but:
+    - on Mega measData can be bigger than EEPROM can fit. not handle for this case atm

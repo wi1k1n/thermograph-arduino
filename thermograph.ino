@@ -580,11 +580,11 @@ void onButtonSave() {
   // return;
 
   // first 7 bytes of eeprom contain service info
-  uint16_t indOfStart, dataLength, dataCurs;
+  uint16_t indOfStart, dataCurs;
   int8_t mpmin, mpmax;
   uint8_t mpcap;
   boolean cycl;
-  eepromGetIndLen(indOfStart, dataLength, mpmin, mpmax, mpcap, dataCurs, cycl);
+  eepromGetIndLen(indOfStart, mpmin, mpmax, mpcap, dataCurs, cycl);
 
   // display->setCursor(0, 0);
   // display->print(indOfStart);
@@ -605,14 +605,11 @@ void onButtonSave() {
   // return;
 
   // validate and "constrain"
-  // first 7 bytes and last 2 bytes are reserved as service storage
+  // first 6 bytes and last 2 bytes are reserved as service storage
   if (indOfStart < EEPROMDATASTARTINDEX || indOfStart >= EEPROMDATAENDINDEX) indOfStart = EEPROMDATASTARTINDEX;
-  if (dataLength >= EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX)
-    dataLength = EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX;
-  // if (dataCurs >= dataLength) dataCurs = 0;
   
   // calculate start index for current saving (for reducing eeprom wear)
-  uint32_t eepromStart = indOfStart + dataLength;
+  uint32_t eepromStart = indOfStart + measData.byteLength();
   if (eepromStart >= EEPROMDATAENDINDEX)
     eepromStart -= EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX;  // wrap cursor around
 
@@ -639,7 +636,7 @@ void onButtonSave() {
   // dbg_end();
 
   // update service bytes
-  eepromPutIndLen(eepromStart, measData.byteLength(), MP_MIN, MP_MAX, MP_CAP, measData.cursor(), measData.cycled());
+  eepromPutIndLen(eepromStart, MP_MIN, MP_MAX, MP_CAP, measData.cursor(), measData.cycled());
 }
 // load data from eeprom
 void onButtonLoad() {
@@ -650,16 +647,14 @@ void onButtonLoad() {
   // return;
 
   // load service information from eeprom
-  uint16_t indOfStart, dataLength, dataCurs;
+  uint16_t indOfStart, dataCurs;
   int8_t mpmin, mpmax;
   uint8_t mpcap;
   boolean cycl;
-  eepromGetIndLen(indOfStart, dataLength, mpmin, mpmax, mpcap, dataCurs, cycl);
+  eepromGetIndLen(indOfStart, mpmin, mpmax, mpcap, dataCurs, cycl);
 
   // validate and "constrain"
   if (indOfStart < EEPROMDATASTARTINDEX || indOfStart >= EEPROMDATAENDINDEX) indOfStart = EEPROMDATASTARTINDEX;
-  if (dataLength >= EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX)
-    dataLength = EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX;
   mpmin = constrain(mpmin, DMIN, DMAX);
   mpmax = constrain(mpmax, DMIN, DMAX);
   if (mpmax - mpmin < 1) {
@@ -676,7 +671,7 @@ void onButtonLoad() {
 
   // indOfStart = 7;
   // load measurements byte-by-byte
-  for (uint8_t i = 0; i < dataLength; i++, indOfStart++) {  // uint16_t for MEGA
+  for (uint8_t i = 0; i < measData.byteLength(); i++, indOfStart++) {  // uint16_t for MEGA
     if (indOfStart >= EEPROMDATAENDINDEX) indOfStart = EEPROMDATAENDINDEX;
     EEPROM.get(indOfStart, measData.byteArray()[i]);
     // uart.println(measArr->byteArray()[i]);
@@ -718,47 +713,42 @@ void onButtonLoad() {
   tempValN = 0;
   measurePartial();
 }
-// reads eepromCursor and dataLength from eeprom
+// reads data service variables from eeprom
 void eepromGetIndLen(uint16_t &ind,
-                     uint16_t &len,
                      int8_t &mpmin,
                      int8_t &mpmax,
                      uint8_t &mpcap,
                      uint16_t &curs,
                      boolean &cycl) {
   // ind - index of byte in eeprom where data starts
-  // len - number of bytes (NOT numbers!) stored in eeprom
   // mpmin/mpmax - min/max values of temperature (in degrees)
   // mpcap - number of bits used for each number
   // curs - index of number (NOT byte!) in data where measurements start
   // cycl - if loaded data is cycled or not (measurements start either from 0 or from curs)
   //
-  // first 7 bytes of eeprom contain service info:
-  //           b0                         b1                         b2
-  // 23 22 21 20 19 18 17 16 | 15 14 13 12 11 10 09 08 | 07 06 05 04 03 02 01 00
-  // <------ indexOfStart (12bits) ------> <------- dataLength (12bits) ------->
-  //           b3                        b4           
+  // first 6 bytes of eeprom contain service info:
+  //           b0                          b1            
+  // 31 30 29 28 27 26 25 24 | 23 22 21 20 19 18 17   16 
+  // <------ indexOfStart (12bits) ------> <-MPCAP-> cycl
+  //           b2                        b3
+  // 15 14 13 12 11 10 09 08 | 07 06 05 04 03 02 01 00
+  //    <----------- dataCursor (15bits) ------------>
+  //           b4                        b5           
   // 23 22 21 20 19 18 17 16 | 15 14 13 12 11 10 09 08
   // <--- MPMIN (8bits) --->   <--- MPMAX (8bits) --->
-  //             b5                      b6
-  // 15 14 13   12  11 10 09 08 | 07 06 05 04 03 02 01 00
-  // <-MPCAP-> cycl <------- dataCursor (12bits) ------->
-  uint8_t b0, b1, b2, b5, b6;
+  uint8_t b0, b1, b2, b3;
   EEPROM.get(0, b0);
   EEPROM.get(1, b1);
   EEPROM.get(2, b2);
-  EEPROM.get(3, mpmin);
-  EEPROM.get(4, mpmax);
-  EEPROM.get(5, b5);
-  EEPROM.get(6, b6);
+  EEPROM.get(3, b3);
+  EEPROM.get(4, mpmin);
+  EEPROM.get(5, mpmax);
   ind = b0 << 4 | b1 >> 4;
-  len = (b1 & 0xF) << 8 | b2;
-  mpcap = (uint8_t)(b5 >> 5) + 1;
-  cycl = bitRead(b5, 4);
-  curs = (b5 & 0xF) << 8 | b6;
+  mpcap = (uint8_t)(b1 >> 1 & 0x7) + 1;
+  cycl = b1 & 0x1;
+  curs = (b2 & 0x7F) << 8 | b3;
 }
 void eepromPutIndLen(const uint16_t &ind,
-                     const uint16_t &len,
                      const int8_t &mpmin,
                      const int8_t &mpmax,
                      const uint8_t &mpcap,
@@ -766,12 +756,11 @@ void eepromPutIndLen(const uint16_t &ind,
                      const boolean &cycl) {
   // args same as in eepromGetIndLen
   EEPROM.put(0, (uint8_t)(ind >> 4));
-  EEPROM.put(1, (uint8_t)((ind & 0xF) << 4 | (len >> 8)));
-  EEPROM.put(2, (uint8_t)(len & 0xFF));
-  EEPROM.put(3, mpmin);
-  EEPROM.put(4, mpmax);
-  EEPROM.put(5, (uint8_t)((mpcap - 1) << 1 | ((uint8_t)cycl)) << 4 | dcurs >> 8);
-  EEPROM.put(6, (uint8_t)(dcurs & 0xFF));
+  EEPROM.put(1, (uint8_t)(((ind & 0xF) << 3 | (mpcap - 1)) << 1 | cycl));
+  EEPROM.put(2, (uint8_t)(dcurs >> 8));
+  EEPROM.put(3, (uint8_t)(dcurs & 0xFF));
+  EEPROM.put(4, mpmin);
+  EEPROM.put(5, mpmax);
 }
 // turn USB synchronization mode on
 void onButtonUSB() {

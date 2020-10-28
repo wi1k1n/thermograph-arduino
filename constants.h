@@ -11,7 +11,7 @@
 #define MP_CAPN (0xFF >> (8 - MP_CAP))  // max number of different values using MP_CAP bits
 
 // EEPROM indices
-#define EEPROMDATASTARTINDEX 7
+#define EEPROMDATASTARTINDEX 6
 #define EEPROMDATAENDINDEX EEPROM.length() - 2
 
 // Hardware constants
