@@ -91,6 +91,13 @@ void setup() {
   // Serial.print("GRAPHYOFFSET: ");
   // Serial.println(GRAPHYOFFSET);
 
+  // connect and quickly communicate with app
+  // (to update the app in case it has been restarted)
+  uart.begin(9600);
+  uart.println(USBSTATUS_END);
+  delay(15);
+  uart.end();
+
   initDisplay(true);
   initParamsFromEEPROM();
   initButtons();
@@ -131,86 +138,84 @@ void loop() {
   }
 
   if (btnL.isPress()) {
-    // if button has been pushed while active (not sleeping)
-    if (!displayWakeUp()) {
-      // if graph screen
-      if (menuScreen == MENUGRAPH) {
-        // graphCursor mode active
-        if (graphCursMode) {
-          if (!btnR.isHold()) {
-            graphCursorMove(-1);
-            forceMenuRedraw = true;
-          }
+    // if graph screen
+    if (menuScreen == MENUGRAPH) {
+      // graphCursor mode active
+      if (graphCursMode) {
+        if (!btnR.isHold()) {
+          graphCursorMove(-1);
+          forceMenuRedraw = true;
         }
       }
     }
   }
   if (btnR.isPress()) {
     // if button has been pushed while active (not sleeping)
-    if (!displayWakeUp()) {
-      if (menuScreen == MENUGRAPH) {
-        // graphCursor mode active
-        if (graphCursMode) {
-          if (!btnL.isHold()) {
-            graphCursorMove(1);
-            forceMenuRedraw = true;
-          }
+    if (menuScreen == MENUGRAPH) {
+      // graphCursor mode active
+      if (graphCursMode) {
+        if (!btnL.isHold()) {
+          graphCursorMove(1);
+          forceMenuRedraw = true;
         }
       }
     }
   }
 
   if (btnL.isSingle()) {
-    // no need for displayWakeUp, since it is already done in isPress() check
-    if (menuScreen == MENULIVE) {
-      changeMenuScreen(MENUGRAPH);
-    }
-    else if (menuScreen == MENUGRAPH) {
-      if (!graphCursMode) {
-        changeMenuScreen(MENULIVE);
+    if (!displayWakeUp()) {
+      if (menuScreen == MENULIVE) {
+        changeMenuScreen(MENUGRAPH);
       }
-    }
-    // if settings screen
-    else if (menuScreen == MENUSETTINGS) {
-      if (displayEnabled) {
-        // if in process of changing settings
-        if (settingIsChanging) {
-          incrementSettingSelected(-1);
-        }
-        // if not changing settings atm
-        else {
-          // focus previous setting
-          settingSelected = settingSelected == 0 ? (SETTINGSNAMESSIZE - 1) : (settingSelected - 1);
-          // timeoutSaveLastMenu.start(); // probably not needed
+      else if (menuScreen == MENUGRAPH) {
+        if (!graphCursMode) {
+          changeMenuScreen(MENULIVE);
         }
       }
+      // if settings screen
+      else if (menuScreen == MENUSETTINGS) {
+        if (displayEnabled) {
+          // if in process of changing settings
+          if (settingIsChanging) {
+            incrementSettingSelected(-1);
+          }
+          // if not changing settings atm
+          else {
+            // focus previous setting
+            settingSelected = settingSelected == 0 ? (SETTINGSNAMESSIZE - 1) : (settingSelected - 1);
+            // timeoutSaveLastMenu.start(); // probably not needed
+          }
+        }
+      }
+      forceMenuRedraw = true;
     }
-    forceMenuRedraw = true;
   }
   if (btnR.isSingle()) {
-    // if graph screen
-    if (menuScreen == MENULIVE) {
-      changeMenuScreen(MENUGRAPH);
-    } else if (menuScreen == MENUGRAPH) {
-      // graphCursor mode not active
-      if (!graphCursMode) {
-        changeMenuScreen(MENULIVE);
-      }
-    }
-    // if settings screen
-    else if (menuScreen == MENUSETTINGS) {
-      if (displayEnabled) {
-        // if in process of changing settings
-        if (settingIsChanging) {
-          incrementSettingSelected(1);
-        }
-        // if not changing settings
-        else {
-          settingSelected = (settingSelected + 1) % SETTINGSNAMESSIZE;
+    if (!displayWakeUp()) {
+      // if graph screen
+      if (menuScreen == MENULIVE) {
+        changeMenuScreen(MENUGRAPH);
+      } else if (menuScreen == MENUGRAPH) {
+        // graphCursor mode not active
+        if (!graphCursMode) {
+          changeMenuScreen(MENULIVE);
         }
       }
+      // if settings screen
+      else if (menuScreen == MENUSETTINGS) {
+        if (displayEnabled) {
+          // if in process of changing settings
+          if (settingIsChanging) {
+            incrementSettingSelected(1);
+          }
+          // if not changing settings
+          else {
+            settingSelected = (settingSelected + 1) % SETTINGSNAMESSIZE;
+          }
+        }
+      }
+      forceMenuRedraw = true;
     }
-    forceMenuRedraw = true;
   }
   // triggers once after BTNHOLDTIMEOUT has passed
   if (btnL.isHolded()) {
@@ -360,49 +365,15 @@ void loop() {
   if (!displayEnabled) { //CURS
     if (uart.available()) {
       byte cmd = uart.read();
-      // send data from meas[]
+      // send data from measData
       if (cmd == USBCMD_SENDDATA) {
-        uart.print("NOTIMPLEMENTED");
-        // uart.print(timerStoreTemp.getInterval());
-        // uart.print(' ');
-        // uint8_t i = cycled ? curs : 0;  // uint16_t for MEGA
-        // for (;;) {
-        //   uart.print(getTemp(i));
-        //   i++;
-        //   if (i == measArr->length()) i = 0;  // wrap around i
-        //   if (i == curs) break;  // stop condition
-        //   uart.print(',');
-        // }
-        // uart.print('\r');
-        // uart.print('\n');
-      }
-      // send content of eeprom
-      else if (cmd == USBCMD_SENDEEPROM) {
-        uart.print("NOTIMPLEMENTED");
-        // uint16_t indOfStart, dataLength;
-        // int8_t mpmin, mpmax;
-        // uint8_t mpcap;
-        // eepromGetIndLen(indOfStart, dataLength, mpmin, mpmax, mpcap);
-        // if (indOfStart < EEPROMDATASTARTINDEX || indOfStart >= EEPROMDATAENDINDEX)
-        //   indOfStart = EEPROMDATASTARTINDEX;
-        // if (dataLength > EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX)
-        //   dataLength = EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX;
-        
-        // uart.print(timerStoreTemp.getInterval());
-        // uart.print(' ');
-        // uint16_t indLast = indOfStart + dataLength - 1;
-        // if (indLast >= EEPROMDATAENDINDEX)
-        //   indLast -= EEPROMDATAENDINDEX - EEPROMDATASTARTINDEX;
-        // for (;; ++indOfStart) {
-        //   uint8_t d;
-        //   EEPROM.get(indOfStart, d);
-        //   uart.print(d);
-        //   if (indOfStart == EEPROMDATAENDINDEX) indOfStart = EEPROMDATASTARTINDEX;  // wrap around i
-        //   if (indOfStart == indLast) break;  // stop condition
-        //   uart.print(',');
-        // }
-        // uart.print('\r');
-        // uart.print('\n');
+        uart.print(timerStoreTemp.getInterval());
+        uart.print(' ');
+        for (uint16_t i = 0; i < measData.count(); i++) {
+          uart.print(getTemp(i));
+          uart.print(',');
+        }
+        uart.println();
       }
       // start sending updates
       else if (cmd == USBCMD_SENDLIVESTART) {
@@ -462,23 +433,20 @@ void initParamsFromEEPROM() {
   // s_line (3 bit) - last selected entry in settings
   //
   //          b1022                      b1023
-  // 15 14 13  12 11 10 09  08 |  07  06 05 04   03 02 01 00
-  // <- dim->  <- graph ->  < menu >  <s_line>
-  uint16_t params;
-  EEPROM.get(EEPROM.length() - 2, params);
-  settingsOptsDimmingCur = params >> 13;
-  settingsOptsGraphCur = (params >> 9) & 15;
-  menuScreen = (params >> 7) & 3;
-  settingSelected = (params >> 4) & 7;
+  // 15 14 13  12 11 10 09  08 | 07 06 05  04 03  02 01 00
+  // <- dim->  <- graph ->                 <menu> <s_line>
+  uint8_t b1022, b1023;
+  EEPROM.get(EEPROM.length() - 2, b1022);
+  EEPROM.get(EEPROM.length() - 1, b1023);
+  settingsOptsDimmingCur = b1022 >> 5;
+  settingsOptsGraphCur = (b1022 >> 1) & 0xF;
+  menuScreen = (b1023 >> 3) & 0x3;
+  settingSelected = b1023 & 0x7;
 }
 void saveParams2EEPROM() {
   // 3 bits for dim, 4 bits for graph, 2 bits for last_menu, 3 bits for setting_entry
-  uint16_t params = settingsOptsDimmingCur << 4;
-  params = (params << 4) | settingsOptsGraphCur;
-  params = (params << 2) | menuScreen;
-  params = (params << 3) | settingSelected;
-  params <<= 4;
-  EEPROM.put(EEPROM.length() - 2, params);
+  EEPROM.put(EEPROM.length() - 2, (uint8_t)(settingsOptsDimmingCur << 4 | settingsOptsGraphCur) << 1);
+  EEPROM.put(EEPROM.length() - 1, (uint8_t)(menuScreen << 3 | settingSelected));
 }
 void initButtons() {
   btnL.setDebounce(BTNDEBOUNCE);
@@ -508,6 +476,9 @@ void initTimers() {
   // when last visited screen should be stored in EEPROM
   timeoutSaveLastMenu.setTimeout(EEPROMSAVEMENUTIMEOUT);
   timeoutSaveLastMenu.stop();
+
+  // when display starts dimming
+  setDisplayDimTimer();
 }
 
 void changeMenuScreen(const uint8_t menu) {
@@ -517,14 +488,14 @@ void changeMenuScreen(const uint8_t menu) {
 // either wakes arduino up and resets dimTimeout, or just resets timeout.
 // returns true, if woke up, false, if only timeout has been reset
 bool displayWakeUp() {
-  if (!displayEnabled) return;
+  if (!displayEnabled)
+    return false;
   if (isDimmed) {
     dim(false);
     return true;
-  } else {
-    updateDimTimer();
-    return false;
   }
+  updateDimTimer();
+  return false;
 }
 // either turns dim on or off
 void dim(const bool v) {
@@ -782,7 +753,7 @@ void startSerialUSB() {
 void endSerialUSB() {
   updateMeasurementUSB = false;
   uart.println(USBSTATUS_END);
-  delay(5);
+  delay(15);
   uart.end();
 
   display = new Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
@@ -1149,7 +1120,6 @@ void pushTemp(float temp) {
     uint8_t tMeas = (uint8_t)(tShifted * MP_CAPN / MP_RANGE);
     measData.push(tMeas);
 }
-
 
 
 void dbg_begin() {

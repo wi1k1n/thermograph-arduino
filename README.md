@@ -48,9 +48,7 @@ Hold RIGHT button to exit SETTINGS screen.
 
 ## TODO list
 
-- EEPROM [Save]/[Load] contain errors
-    - with fixed eeprom start index works well
-- range for graph is calculated in a wrong way (bcuz of bcarray)
+- Menu for choosing correct MP_MIN/MP_MAX/MP_CAP settings
 - bcarray: correct wraping for cursor (leave unused space of last byte untouched!)
 - Optimize memory usage
     - Display lib takes ~200 bytes of SRAM (+1KB is allocated dynamically on Heap)
@@ -58,18 +56,21 @@ Hold RIGHT button to exit SETTINGS screen.
     - Each GButton take ~23 bytes (could be less?), so ~46 bytes in total
     - use int16_t (100 times bigger, for .xx precision) instead of floats for measMin(G)/measMax(G) & tempValPartAverage
 - Optimize flash usage
-    - remove adafruit splash logo
-- [Pause] button
+    - make eeprom validate and constrain part into one function
+- [Pause] button (or option in graph timeout menu)
 - Prettier USB mode display text
-- Tiny scale on graph cursor mode (for visual navigation, when exploring a lot of same values)
+- Tiny ruller on graph cursor mode (for visual navigation, when exploring a lot of same values)
 - getter/setter in RBCArray class
 
 ## Known bugs
 
-- Test [Save]/[Load] and USB-mode for storing/loading/sending all needed data (e.g. 128/128 measurements)
+- displayWakeUp() does not work properly
 - Time estimations r not accurate (should be rounded instead of flooring)
-- No time memory (only considers current graph timeout setting, even if the whole graph has been built with different graph timeout)
 - Low memory
 - Holding both buttons does not stop graph cursor from moving
 - Not tested on Mega, but:
     - on Mega measData can be bigger than EEPROM can fit. not handle for this case atm
+
+#### Non-realistic to fix/implement
+
+- No time memory (only considers current graph timeout setting, even if the whole graph has been built with different graph timeout)
