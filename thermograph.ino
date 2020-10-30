@@ -438,10 +438,11 @@ void initParamsFromEEPROM() {
   uint8_t b1022, b1023;
   EEPROM.get(EEPROM.length() - 2, b1022);
   EEPROM.get(EEPROM.length() - 1, b1023);
-  settingsOptsDimmingCur = b1022 >> 5;
-  settingsOptsGraphCur = (b1022 >> 1) & 0xF;
-  menuScreen = (b1023 >> 3) & 0x3;
-  settingSelected = b1023 & 0x7;
+  // % is needed as a constraint for frist run (when invalid data can come from eeprom)
+  settingsOptsDimmingCur = (b1022 >> 5) % SETTINGSOPTSDIMMINGSIZE;
+  settingsOptsGraphCur = ((b1022 >> 1) & 0xF) % SETTINGSOPTSGRAPHSIZE;
+  menuScreen = ((b1023 >> 3) & 0x3) % MENUCOUNT;
+  settingSelected = (b1023 & 0x7) % SETTINGSCOUNT;
 }
 void saveParams2EEPROM() {
   // 3 bits for dim, 4 bits for graph, 2 bits for last_menu, 3 bits for setting_entry

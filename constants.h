@@ -43,9 +43,11 @@
 #define DISPLAYLOGODURATION 1500
 
 // Menu constants
-#define MENULIVE      0
-#define MENUGRAPH     1
-#define MENUSETTINGS  2
+#define MENULIVE        0
+#define MENUGRAPH       1
+#define MENUSETTINGS    2
+// !!!!! !!!!! !!!!!
+#define MENUCOUNT       3
 
 // Menu: Graph constants
 #define GRAPHBTNSTEPS4SPEED 20  // steps after which speed is increased by GRAPHBTNSPEED
@@ -61,6 +63,8 @@
 #define SETTINGSSAVE            3
 #define SETTINGSLOAD            4
 #define SETTINGSUSB             5
+// !!!!! !!!!! !!!!!
+#define SETTINGSCOUNT           6
 
 // USB
 #define USBCMD_PING             0x02

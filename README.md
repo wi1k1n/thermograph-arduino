@@ -23,7 +23,8 @@ There are 3 possible screens: LIVE, GRAPH and SETTINGS.
 Device is controlled by 2 buttons: LEFT and RIGHT.
 
 ## Controls
-#### LIVE screen
+(Coming soon)
+<!-- #### LIVE screen
 LIVE screen does not have any special submodes.
 Single click of both LEFT and RIGHT buttons changes screen to GRAPH.
 Holding RIGHT button switches screen to SETTINGS.
@@ -44,11 +45,12 @@ Hold LEFT button to start changing (or activating) current setting.
 Use LEFT/RIGHT buttons to change value of current setting.
 Hold LEFT button to accept changes.
 
-Hold RIGHT button to exit SETTINGS screen.
+Hold RIGHT button to exit SETTINGS screen. -->
 
 ## TODO list
 
 - Menu for choosing correct MP_MIN/MP_MAX/MP_CAP settings
+- Pause timeout
 - bcarray: correct wraping for cursor (leave unused space of last byte untouched!)
 - Optimize memory usage
     - Display lib takes ~200 bytes of SRAM (+1KB is allocated dynamically on Heap)
@@ -61,6 +63,7 @@ Hold RIGHT button to exit SETTINGS screen.
 - Prettier USB mode display text
 - Tiny ruller on graph cursor mode (for visual navigation, when exploring a lot of same values)
 - getter/setter in RBCArray class
+- may be (if enough flash space add build version)
 
 ## Known bugs
 
