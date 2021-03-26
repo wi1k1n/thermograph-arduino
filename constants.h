@@ -21,7 +21,7 @@
 #define TEMPMIN_A 14  // value on 
 
 // Pins
-#define THERMISTORPIN 0  // analog input pin for thermistor
+#define THERMISTORPIN 1  // analog input pin for thermistor
 #define BTNLEFT_PIN 3
 #define BTNRIGHT_PIN 2
 #define OLED_RESET -1 // Reset pin # (or -1 if sharing Arduino reset pin)
