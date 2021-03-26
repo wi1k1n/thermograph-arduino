@@ -1,6 +1,6 @@
 ## Thermograph
 
-Build a arduino-based thermometer.
+An autonomous arduino-based thermometer with display and UART interface.
 
 ## Hardware
 
@@ -9,9 +9,13 @@ Build a arduino-based thermometer.
 - Themistor
 - A few resistors
 
+## Case
+
+![](hardware/model.png)
+
 ## Wiring
 
-(Coming soon)
+![](hardware/scheme.png "Wiring scheme")
 
 ## Overview
 There are 3 possible screens: LIVE, GRAPH and SETTINGS.
