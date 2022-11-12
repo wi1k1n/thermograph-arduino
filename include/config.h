@@ -5,8 +5,6 @@
 #include "storage.h"
 #include <MsgPack.h>
 
-const char STORAGEKEY_CONFIG[] PROGMEM = "config";
-
 class ConfigurationManager : public SetupBase {
     StorageManager* _storage{ nullptr };
     MsgPack::map_t<uint8_t, uint8_t> _config;

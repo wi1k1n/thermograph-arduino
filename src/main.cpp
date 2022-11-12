@@ -2,10 +2,13 @@
 #include "config.h"
 #include "interaction.h"
 #include "storage.h"
+#include "display.h"
 
 class Application : public SetupBase {
   ConfigurationManager    _config;
   StorageManager          _storage;
+  Display<DisplaySSD1306> _display;
+
   HardwareInteraction     _interactHW;
   WebserverInteraction    _interactWS;
 public:
@@ -19,6 +22,7 @@ bool Application::setup() {
   bool setupSuccess = true;
   setupSuccess &= _storage.setup();
   setupSuccess &= _config.setup(&_storage);
+  setupSuccess &= _display.setup();
   return setupSuccess;
 }
 
