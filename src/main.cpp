@@ -1,18 +1,25 @@
-#include <WiFiManager.h> // https://github.com/tzapu/WiFiManager
-
 #include "sdk.h"
 #include "config.h"
+#include "interaction.h"
+#include "storage.h"
 
-class Application {
-  ConfigurationManager _config;
+class Application : public SetupBase {
+  ConfigurationManager    _config;
+  StorageManager          _storage;
+  HardwareInteraction     _interactHW;
+  WebserverInteraction    _interactWS;
 public:
-  Bool setup();
+  bool setup() override;
   void loop();
 };
 
 bool Application::setup() {
-  Bool configSetup = _config.setup();
-  return true;
+  SetupBase::setup();
+
+  bool setupSuccess = true;
+  setupSuccess &= _storage.setup();
+  setupSuccess &= _config.setup(&_storage);
+  return setupSuccess;
 }
 
 void Application::loop() {
@@ -20,8 +27,16 @@ void Application::loop() {
 }
 
 Application app;
+
 void setup() {
-  app.setup();
+#ifdef TDEBUG
+  Serial.begin(115200);
+  delay(1);
+  Serial.println();
+#endif
+  bool setupSuccess = app.setup();
+  LOG(F("setup() -> "));
+  LOGLN(static_cast<bool>(setupSuccess));
 }
 void loop() {
   app.loop();
