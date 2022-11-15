@@ -20,3 +20,6 @@ Should...
 - Because of the limited storage capacity (1KB for Atmega328P and 4KB for ESP8266 emulated in flash -> or better LittleFS), the storing should be optimized for capacity (using data compression, e.g. zlib, uzlib, miniz?)
 - EEPROM is susceptible for number of overwrites, storing algorithm should consider it to avoid wearing of some specific memory segments (LittleFS solves this problem out of the box)
 - The codebase should address the power supply is limits (e.g. using deep sleeping, when possible). Possible power supply: a couple of AA or AAA batteries
+
+### TODO List:
+- Rethink the _SetupBase_ concept

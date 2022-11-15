@@ -10,42 +10,44 @@
 
 #include <memory>
 
-class DisplayView {
+class DisplayInterface;
 
+class DisplayView {
+protected:
+    std::shared_ptr<DisplayInterface> _display{ nullptr };
+
+public:
+    bool setup(DisplayInterface* display);
+
+    virtual bool display();
 };
 
-template <class DisplayImpl>
-class Display : public SetupBase {
-    DisplayImpl _display;
-
-    DisplayView _dvWelcome;
-    DisplayView _dvIdle;
+class DisplayViewStatus : public DisplayView {
 public:
-    bool setup() override;
+    bool display() override;
 };
 
 class DisplayInterface : public SetupBase {
+    DisplayViewStatus _dvStatus;
+
 protected:
     uint16_t _width{ DISPLAY_SCREEN_WIDTH };
     uint16_t _height{ DISPLAY_SCREEN_HEIGHT };
+
 public:
+    virtual bool display() { return true; };
+
+    uint16_t getWidth() const { return _width; }
+    uint16_t getHeight() const { return _height; }
 };
 
 class DisplaySSD1306 : public DisplayInterface {
     std::unique_ptr<Adafruit_SSD1306> _display{ nullptr };
+
 public:
-    bool setup() override {
-        DisplayInterface::setup();
-
-        _display = std::unique_ptr<Adafruit_SSD1306>(new Adafruit_SSD1306(_width, _height, &Wire, DISPLAY_PIN_RESET));
-        if (!_display->begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-            DLOGLN(F("Couldn't start up the display!"));
-            return false;
-        }
-        return true;
-    }
+    bool setup() override;
+    
+    bool display() override;
 };
-
-template class Display<DisplaySSD1306>;
 
 #endif // DISPLAY_H__

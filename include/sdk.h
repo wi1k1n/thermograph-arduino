@@ -10,6 +10,8 @@ static const int8_t DISPLAY_PIN_RESET = -1;
 
 static const char STORAGEKEY_CONFIG[] PROGMEM = "config";
 
+static const uint8_t INTERACTION_HW_PIN_B1 = 0; // D3
+
 #define TDEBUG
 
 #ifdef TDEBUG

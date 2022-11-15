@@ -6,9 +6,15 @@
 #include <MsgPack.h>
 
 class ConfigurationManager : public SetupBase {
-    StorageManager* _storage{ nullptr };
+    enum Config {
+        HARDWARE,       // <bool> if hardware enabled
+        WEBSERVER,      // <bool> if webserver enabled
+    };
+
+    StorageManager* _storage{ nullptr }; // TODO: use smart pointers
     MsgPack::map_t<uint8_t, uint8_t> _config;
 
+    void createDefaultConfig();
 public:
     bool setup(StorageManager* storage);
 };
@@ -33,12 +39,11 @@ bool ConfigurationManager::setup(StorageManager* storage) {
             return false;
         }
     } else { // config doesn't exist in storage yet
-        // TODO: create default values for _config
         DLOG(F("Configuration file: '"));
         LOG(STORAGEKEY_CONFIG);
         LOGLN(F("' not found!"));
 
-        // TODO: Create default config
+        createDefaultConfig();
 
         MsgPack::Packer packer;
         packer.serialize(_config);
@@ -68,6 +73,11 @@ bool ConfigurationManager::setup(StorageManager* storage) {
     for (auto entry : _config) { LOG(entry.first); LOG(F(" -> ")); LOGLN(entry.second); }
 
     return _storage;
+}
+
+void ConfigurationManager::createDefaultConfig() {
+    _config.insert({ ConfigurationManager::Config::HARDWARE, true });
+    _config.insert({ ConfigurationManager::Config::WEBSERVER, false });
 }
 
 #endif // CONFIG_H__

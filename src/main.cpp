@@ -7,10 +7,9 @@
 class Application : public SetupBase {
   ConfigurationManager    _config;
   StorageManager          _storage;
-  Display<DisplaySSD1306> _display;
+  DisplayInterface        _display = DisplaySSD1306();
 
-  HardwareInteraction     _interactHW;
-  WebserverInteraction    _interactWS;
+  HardwareInteraction     _interactionHW;
 public:
   bool setup() override;
   void loop();
@@ -23,11 +22,13 @@ bool Application::setup() {
   setupSuccess &= _storage.setup();
   setupSuccess &= _config.setup(&_storage);
   setupSuccess &= _display.setup();
+  setupSuccess &= _interactionHW.setup(&_display);
+
   return setupSuccess;
 }
 
 void Application::loop() {
-
+  _interactionHW.loop();
 }
 
 Application app;
