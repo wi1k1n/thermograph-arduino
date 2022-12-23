@@ -1,32 +1,22 @@
 #include "sdk.h"
-#include "config.h"
-#include "interaction.h"
-#include "storage.h"
-#include "display.h"
 
-class Application : public SetupBase {
-  ConfigurationManager    _config;
-  StorageManager          _storage;
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 
-  HardwareInteraction     _interactionHW;
+class Application {
 public:
-  bool setup() override;
+  bool setup();
   void loop();
 };
 
 bool Application::setup() {
-  SetupBase::setup();
-
-  bool setupSuccess = true;
-  setupSuccess &= _storage.setup();
-  setupSuccess &= _config.setup(&_storage);
-  setupSuccess &= _interactionHW.setup();
-
-  return setupSuccess;
+  return true;
 }
 
 void Application::loop() {
-  _interactionHW.loop();
+
 }
 
 Application app;
