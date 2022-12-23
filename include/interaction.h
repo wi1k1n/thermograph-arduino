@@ -26,22 +26,15 @@ public:
 };
 
 class HardwareInteraction : public InteractionInterface {
-    std::shared_ptr<DisplayInterface>         _display;
+    DisplayInterface _display = DisplaySSD1306();
     EncButton<EB_TICK, INTERACTION_HW_PIN_B1> _button1;
 
 public:
-    bool setup(DisplayInterface* display) {
+    bool setup() {
         if (!InteractionInterface::setup()) {
             return false;
         }
-
-        _display.reset(display);
-        if (!_display || !_display->isReady()) {
-            DLOGLN(F("Display is not initialized!"));
-            return false;
-        }
-
-        return true;
+        return _display.setup();
     }
 
     void loop() override {

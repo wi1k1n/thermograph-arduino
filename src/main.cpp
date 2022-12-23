@@ -7,7 +7,6 @@
 class Application : public SetupBase {
   ConfigurationManager    _config;
   StorageManager          _storage;
-  DisplayInterface        _display = DisplaySSD1306();
 
   HardwareInteraction     _interactionHW;
 public:
@@ -21,8 +20,7 @@ bool Application::setup() {
   bool setupSuccess = true;
   setupSuccess &= _storage.setup();
   setupSuccess &= _config.setup(&_storage);
-  setupSuccess &= _display.setup();
-  setupSuccess &= _interactionHW.setup(&_display);
+  setupSuccess &= _interactionHW.setup();
 
   return setupSuccess;
 }
