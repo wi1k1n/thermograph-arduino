@@ -1,22 +1,58 @@
+#include "Arduino.h"
 #include "sdk.h"
-
-#include <SPI.h>
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include "display.h"
+#include "sensor.h"
 
 class Application {
+  Display _display;
+
+  DLayoutWelcome _dlWelcome;
+  DLayoutMain _dlMain;
+
+  TempSensor _sensorTemp;
+
+  void measureTemperature();
 public:
   bool setup();
   void loop();
 };
 
+void Application::measureTemperature() {
+  if (_sensorTemp.measure()) {
+    TempSensorData* dataPtr = static_cast<TempSensorData*>(_sensorTemp.waitForMeasurement());
+    if (dataPtr) {
+      LOG(F("Temperature: "));
+      LOGLN(dataPtr->temp);
+    } else {
+      LOGLN(F("Couldn't get measurement even after 1s!"));
+    }
+  } else {
+    LOGLN(F("Couldn't start measuring temperature!"));
+  }
+}
+
 bool Application::setup() {
+  if (!_sensorTemp.init())
+    return false;
+
+  if (!_display.init(DISPLAY_SCREEN_WIDTH, DISPLAY_SCREEN_HEIGHT, &Wire, 0, 0x3C))
+    return false;
+  
+  if (!_dlWelcome.init(&_display)) {
+    return false;
+  }
+  
+  _dlWelcome.draw();
+  measureTemperature();
+
   return true;
 }
 
 void Application::loop() {
-
+  int16_t x = random(DISPLAY_SCREEN_WIDTH),
+          y = random(DISPLAY_SCREEN_HEIGHT);
+  _display.displayPixel(x, y);
+  delay(250);
 }
 
 Application app;
@@ -27,9 +63,9 @@ void setup() {
   delay(1);
   Serial.println();
 #endif
-  bool setupSuccess = app.setup();
-  LOG(F("setup() -> "));
-  LOGLN(static_cast<bool>(setupSuccess));
+  const bool setupSucceeded = app.setup();
+  DLOGLN(setupSucceeded);
+  delay(5000);
 }
 void loop() {
   app.loop();
