@@ -7,31 +7,16 @@ bool Display::init(uint16_t width, uint16_t height, TwoWire* wire, uint8_t rst, 
     if (_display == nullptr) {
         return false;
     }
-    return _display->begin(SSD1306_SWITCHCAPVCC, addr);
+    bool succeeded = _display->begin(SSD1306_SWITCHCAPVCC, addr);
+    if (!succeeded) {
+        return false;
+    }
+    _display->cp437(true);
+    return true;
 }
 
-void Display::drawPixel(int16_t x, int16_t y, uint16_t clr) {
-    _display->drawPixel(x, y, clr);
-}
-void Display::displayPixel(int16_t x, int16_t y, uint16_t clr) {
-    drawPixel(x, y, clr);
-    display();
-}
-
-void Display::drawBitmap(int16_t x, int16_t y, const uint8_t* bitmap, int16_t w, int16_t h, uint16_t clr, uint16_t bg) {
-    _display->drawBitmap(x, y, bitmap, w, h, clr, bg);
-}
-void Display::displayBitmap(int16_t x, int16_t y, const uint8_t* bitmap, int16_t w, int16_t h, uint16_t clr, uint16_t bg) {
-    drawBitmap(x, y, bitmap, w, h, clr, bg);
-    display();
-}
-
-
-void Display::clear() {
-    _display->clearDisplay();
-}
-void Display::display() {
-    _display->display();
+Adafruit_SSD1306* Display::operator->() {
+    return _display.get();
 }
 
 /////////////////////
@@ -43,10 +28,28 @@ bool DisplayLayout::init(Display* display) {
     return true;
 }
 
-void DLayoutMain::draw() {
-
+void DLayoutWelcome::draw() {
+    display()->drawBitmap(0, 0, static_cast<const uint8_t*>(logoData), LOGO_WIDTH, LOGO_HEIGHT, DISPLAY_WHITE);
+    display()->display();
 }
 
-void DLayoutWelcome::draw() {
-    _display->displayBitmap(0, 0, static_cast<const uint8_t*>(logoData), LOGO_WIDTH, LOGO_HEIGHT, DISPLAY_WHITE);
+void DLayoutMain::setData(const TempSensorData& tempData1) {
+    _temp1 = tempData1.temp;
+}
+void DLayoutMain::draw() {
+    char buffer[16];
+    dtostrf(_temp1, 6, 2, buffer);
+
+    display()->clearDisplay();
+    display()->setTextColor(DISPLAY_WHITE);
+    
+    display()->setCursor(0, DISPLAY_LAYOUT_PADDING_TOP);
+    display()->setTextSize(3);
+    display()->print(buffer);
+
+    display()->setCursor(display()->getCursorX(), display()->getCursorY() - 4);
+    display()->setTextSize(2);
+    display()->print("o");
+
+    display()->display();
 }

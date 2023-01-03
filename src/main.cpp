@@ -23,6 +23,7 @@ void Application::measureTemperature() {
     if (dataPtr) {
       LOG(F("Temperature: "));
       LOGLN(dataPtr->temp);
+      _dlMain.setData(*dataPtr);
     } else {
       LOGLN(F("Couldn't get measurement even after 1s!"));
     }
@@ -41,9 +42,17 @@ bool Application::setup() {
   if (!_dlWelcome.init(&_display)) {
     return false;
   }
+  if (!_dlMain.init(&_display)) {
+    return false;
+  }
   
+  _display->clearDisplay();
+
   _dlWelcome.draw();
+  delay(DISPLAY_LAYOUT_LOGO_DELAY);
+  
   measureTemperature();
+  _dlMain.draw();
 
   return true;
 }
@@ -51,7 +60,7 @@ bool Application::setup() {
 void Application::loop() {
   int16_t x = random(DISPLAY_SCREEN_WIDTH),
           y = random(DISPLAY_SCREEN_HEIGHT);
-  _display.displayPixel(x, y);
+  _display->drawPixel(x, y, DISPLAY_WHITE);
   delay(250);
 }
 

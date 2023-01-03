@@ -8,6 +8,8 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
+#include "sensor.h"
+
 #define DISPLAY_WHITE WHITE
 #define DISPLAY_BLACK BLACK
 
@@ -16,17 +18,13 @@ class Display {
 public:
     bool init(uint16_t width, uint16_t height, TwoWire* wire, uint8_t rst, uint8_t addr);
 
-    void display();
-    void clear();
-    void drawPixel(int16_t x, int16_t y, uint16_t clr = DISPLAY_WHITE);
-    void displayPixel(int16_t x, int16_t y, uint16_t clr = DISPLAY_WHITE);
-    void drawBitmap(int16_t x, int16_t y, const uint8_t* bitmap, int16_t w, int16_t h, uint16_t clr = DISPLAY_WHITE, uint16_t bg = DISPLAY_BLACK);
-    void displayBitmap(int16_t x, int16_t y, const uint8_t* bitmap, int16_t w, int16_t h, uint16_t clr = DISPLAY_WHITE, uint16_t bg = DISPLAY_BLACK);
+    Adafruit_SSD1306* operator->();
 };
 
 class DisplayLayout {
 protected:
     Display* _display;
+    inline Display& display() { return *_display; }
 public:
     DisplayLayout() = default;
     bool init(Display* display);
@@ -39,7 +37,9 @@ public:
 };
 
 class DLayoutMain : public DisplayLayout {
+    float _temp1;
 public:
+    void setData(const TempSensorData& tempData1);
     void draw() override;
 };
 
