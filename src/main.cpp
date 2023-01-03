@@ -11,6 +11,7 @@ class Application {
   TimerLED _displayErrorTimerLED;
   DLayoutWelcome _dlWelcome;
   DLayoutMain _dlMain;
+  DLTransition _dltransMain;
   PushButton _btn1;
   TempSensor _sensorTemp;
 
@@ -62,12 +63,16 @@ bool Application::setup() {
     return false;
   }
 
+  if (!_dltransMain.init(&_display)) {
+    return false;
+  }
+
   if (!_btn1.init(INTERACT_PUSHBUTTON_1_PIN)) {
     DLOGLN(initFailed);
     return false;
   }
 
-  if (!_DEBUG_randomPixel.init(100, Timer::MODE::PERIOD)) {
+  if (!_DEBUG_randomPixel.init(200, Timer::MODE::PERIOD)) {
     DLOGLN(initFailed);
     return false;
   }
@@ -75,14 +80,9 @@ bool Application::setup() {
   _display->clearDisplay();
 
   _dlWelcome.draw();
-  delay(DISPLAY_LAYOUT_LOGO_DELAY);
+  // delay(DISPLAY_LAYOUT_LOGO_DELAY);
   
   measureTemperature();
-  _dlMain.draw();
-
-  // _display->startscrollleft(0x00, 0x01);
-  // DLTransition(_display, _dlMain, _dlWelcome);
-  _display->display();
 
   _DEBUG_randomPixel.start();
 
@@ -95,24 +95,25 @@ void Application::loop() {
     _displayErrorTimerLED.tick();
   }
 
+  _dltransMain.tick();
+
   if (_btn1.tick()) {
     if (_btn1.click()) {
       LOGLN(F("Button clicked!"));
-      _display.scroll(32, Display::ScrollDir::LEFT, static_cast<Display::ScrollType>(type));
-      _display->display();
-      type = (type + 1) % 3;
-      
-        // NONE = 0,
-        // WRAP,
-        // FILL_BLACK
+      if (type == 0) {
+        _dltransMain.start(&_dlWelcome, &_dlMain, Display::ScrollDir::LEFT);
+      } else {
+        _dltransMain.start(&_dlMain, &_dlWelcome, Display::ScrollDir::RIGHT);
+      }
+      type = (type + 1) % 2;
     }
   }
 
   if (_DEBUG_randomPixel.tick()) {
     int16_t x = random(_display->width()),
             y = random(_display->height());
-    // _display->drawPixel(x, y, DISPLAY_WHITE);
-    // _display->display();
+    _display->drawPixel(x, y, DISPLAY_WHITE);
+    _display->display();
   }
 }
 
