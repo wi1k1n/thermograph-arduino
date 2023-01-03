@@ -4,20 +4,20 @@
 #include "sensor.h"
 #include "interact.h"
 #include "utilities.h"
+#include "TimerLED.h"
 
 class Application {
   Display _display;
-
-  PushButton _btn1;
-
+  TimerLED _displayErrorTimerLED;
   DLayoutWelcome _dlWelcome;
   DLayoutMain _dlMain;
-
+  PushButton _btn1;
   TempSensor _sensorTemp;
 
   Timer _DEBUG_randomPixel;
 
   void measureTemperature();
+  void showDisplayError();
 public:
   bool setup();
   void loop();
@@ -27,9 +27,9 @@ void Application::measureTemperature() {
   if (_sensorTemp.measure()) {
     TempSensorData* dataPtr = static_cast<TempSensorData*>(_sensorTemp.waitForMeasurement());
     if (dataPtr) {
+      _dlMain.update(dataPtr);
       LOG(F("Temperature: "));
       LOGLN(dataPtr->temp);
-      _dlMain.update(dataPtr);
     } else {
       LOGLN(F("Couldn't get measurement even after 1s!"));
     }
@@ -39,24 +39,36 @@ void Application::measureTemperature() {
 }
 
 bool Application::setup() {
-  if (!_sensorTemp.init())
+  String initFailed = F("init() failed!");
+  if (!_sensorTemp.init()) {
+    DLOGLN(initFailed);
     return false;
+  }
 
-  if (!_display.init(DISPLAY_SCREEN_WIDTH, DISPLAY_SCREEN_HEIGHT, &Wire, 0, 0x3C))
+  if (!_display.init(&Wire, 0, 0x3C)) {
+    _displayErrorTimerLED.init(LED_BUILTIN);
+    _displayErrorTimerLED.setIntervals(4, (const uint16_t[]){ 50, 100, 150, 100 });
+    _displayErrorTimerLED.restart();
+    DLOGLN(initFailed);
     return false;
+  }
   
   if (!_dlWelcome.init(&_display)) {
+    DLOGLN(initFailed);
     return false;
   }
   if (!_dlMain.init(&_display)) {
+    DLOGLN(initFailed);
     return false;
   }
 
   if (!_btn1.init(INTERACT_PUSHBUTTON_1_PIN)) {
+    DLOGLN(initFailed);
     return false;
   }
 
-  if (!_DEBUG_randomPixel.init(250, Timer::MODE::PERIOD)) {
+  if (!_DEBUG_randomPixel.init(100, Timer::MODE::PERIOD)) {
+    DLOGLN(initFailed);
     return false;
   }
   
@@ -68,23 +80,39 @@ bool Application::setup() {
   measureTemperature();
   _dlMain.draw();
 
+  // _display->startscrollleft(0x00, 0x01);
+  // DLTransition(_display, _dlMain, _dlWelcome);
+  _display->display();
+
   _DEBUG_randomPixel.start();
 
   return true;
 }
 
+uint8_t type = 0;
 void Application::loop() {
-  _btn1.tick();
+  if (_displayErrorTimerLED.isActive()) {
+    _displayErrorTimerLED.tick();
+  }
 
-  if (_btn1.click()) {
-    LOGLN(F("Button clicked!"));
+  if (_btn1.tick()) {
+    if (_btn1.click()) {
+      LOGLN(F("Button clicked!"));
+      _display.scroll(32, Display::ScrollDir::LEFT, static_cast<Display::ScrollType>(type));
+      _display->display();
+      type = (type + 1) % 3;
+      
+        // NONE = 0,
+        // WRAP,
+        // FILL_BLACK
+    }
   }
 
   if (_DEBUG_randomPixel.tick()) {
-    int16_t x = random(DISPLAY_SCREEN_WIDTH),
-            y = random(DISPLAY_SCREEN_HEIGHT);
-    _display->drawPixel(x, y, DISPLAY_WHITE);
-    _display->display();
+    int16_t x = random(_display->width()),
+            y = random(_display->height());
+    // _display->drawPixel(x, y, DISPLAY_WHITE);
+    // _display->display();
   }
 }
 
@@ -98,8 +126,8 @@ void setup() {
 #endif
   const bool setupSucceeded = app.setup();
   DLOGLN(setupSucceeded);
-  delay(5000);
 }
+
 void loop() {
   app.loop();
 }

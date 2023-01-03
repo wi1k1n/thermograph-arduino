@@ -4,8 +4,6 @@
 #include <Arduino.h>
 #include <unordered_map>
 
-static const uint16_t DISPLAY_SCREEN_WIDTH = 128;
-static const uint16_t DISPLAY_SCREEN_HEIGHT = 64;
 static const int8_t DISPLAY_PIN_RESET = -1;
 
 static const uint16_t DISPLAY_LAYOUT_LOGO_DELAY = 1000; // ms
