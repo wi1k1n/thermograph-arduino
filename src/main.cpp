@@ -2,14 +2,20 @@
 #include "sdk.h"
 #include "display.h"
 #include "sensor.h"
+#include "interact.h"
+#include "utilities.h"
 
 class Application {
   Display _display;
+
+  PushButton _btn1;
 
   DLayoutWelcome _dlWelcome;
   DLayoutMain _dlMain;
 
   TempSensor _sensorTemp;
+
+  Timer _DEBUG_randomPixel;
 
   void measureTemperature();
 public:
@@ -23,7 +29,7 @@ void Application::measureTemperature() {
     if (dataPtr) {
       LOG(F("Temperature: "));
       LOGLN(dataPtr->temp);
-      _dlMain.setData(*dataPtr);
+      _dlMain.update(dataPtr);
     } else {
       LOGLN(F("Couldn't get measurement even after 1s!"));
     }
@@ -45,6 +51,14 @@ bool Application::setup() {
   if (!_dlMain.init(&_display)) {
     return false;
   }
+
+  if (!_btn1.init(INTERACT_PUSHBUTTON_1_PIN)) {
+    return false;
+  }
+
+  if (!_DEBUG_randomPixel.init(250, Timer::MODE::PERIOD)) {
+    return false;
+  }
   
   _display->clearDisplay();
 
@@ -54,14 +68,24 @@ bool Application::setup() {
   measureTemperature();
   _dlMain.draw();
 
+  _DEBUG_randomPixel.start();
+
   return true;
 }
 
 void Application::loop() {
-  int16_t x = random(DISPLAY_SCREEN_WIDTH),
-          y = random(DISPLAY_SCREEN_HEIGHT);
-  _display->drawPixel(x, y, DISPLAY_WHITE);
-  delay(250);
+  _btn1.tick();
+
+  if (_btn1.click()) {
+    LOGLN(F("Button clicked!"));
+  }
+
+  if (_DEBUG_randomPixel.tick()) {
+    int16_t x = random(DISPLAY_SCREEN_WIDTH),
+            y = random(DISPLAY_SCREEN_HEIGHT);
+    _display->drawPixel(x, y, DISPLAY_WHITE);
+    _display->display();
+  }
 }
 
 Application app;

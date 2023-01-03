@@ -29,6 +29,7 @@ public:
     DisplayLayout() = default;
     bool init(Display* display);
     virtual void draw() { }
+    virtual void update(void* data) { }
 };
 
 class DLayoutWelcome : public DisplayLayout {
@@ -39,8 +40,13 @@ public:
 class DLayoutMain : public DisplayLayout {
     float _temp1;
 public:
-    void setData(const TempSensorData& tempData1);
     void draw() override;
+    void update(void* data) override;
+};
+
+
+class DisplayMenu {
+
 };
 
 #endif // DISPLAY_H__

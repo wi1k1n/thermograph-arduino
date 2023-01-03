@@ -33,8 +33,9 @@ void DLayoutWelcome::draw() {
     display()->display();
 }
 
-void DLayoutMain::setData(const TempSensorData& tempData1) {
-    _temp1 = tempData1.temp;
+void DLayoutMain::update(void* data) {
+    TempSensorData* tempData = static_cast<TempSensorData*>(data);
+    _temp1 = tempData->temp;
 }
 void DLayoutMain::draw() {
     char buffer[16];

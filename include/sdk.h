@@ -11,9 +11,9 @@ static const int8_t DISPLAY_PIN_RESET = -1;
 static const uint16_t DISPLAY_LAYOUT_LOGO_DELAY = 1000; // ms
 static const uint8_t DISPLAY_LAYOUT_PADDING_TOP = 16;
 
-static const char STORAGEKEY_CONFIG[] PROGMEM = "config";
+static const uint8_t INTERACT_PUSHBUTTON_1_PIN = 0; // D3
 
-static const uint8_t INTERACTION_HW_PIN_B1 = 0; // D3
+static const char STORAGEKEY_CONFIG[] PROGMEM = "config";
 
 #define TDEBUG
 
