@@ -1,106 +1,108 @@
 #include "main.h"
 
 void Application::measureTemperature() {
-  if (_sensorTemp.measure()) {
-    TempSensorData* dataPtr = static_cast<TempSensorData*>(_sensorTemp.waitForMeasurement());
-    if (dataPtr) {
-      _dLayouts[DisplayLayoutKeys::MAIN]->update(dataPtr);
-      LOG(F("Temperature: "));
-      LOGLN(dataPtr->temp);
-    } else {
-      LOGLN(F("Couldn't get measurement even after 1s!"));
-    }
-  } else {
-    LOGLN(F("Couldn't start measuring temperature!"));
-  }
+	if (_sensorTemp.measure()) {
+		TempSensorData* dataPtr = static_cast<TempSensorData*>(_sensorTemp.waitForMeasurement());
+		if (dataPtr) {
+			_dLayouts[DisplayLayoutKeys::MAIN]->update(dataPtr);
+			LOG(F("Temperature: "));
+			LOGLN(dataPtr->temp);
+		} else {
+			LOGLN(F("Couldn't get measurement even after 1s!"));
+		}
+	} else {
+		LOGLN(F("Couldn't start measuring temperature!"));
+	}
 }
 
 bool Application::setup() {
-  String initFailed = F("init() failed!");
-  if (!_display.init(&Wire, 0, 0x3C)) {
-    _displayErrorTimerLED.init(LED_BUILTIN);
-    _displayErrorTimerLED.setIntervals(4, (const uint16_t[]){ 50, 100, 150, 100 });
-    _displayErrorTimerLED.restart();
-    DLOGLN(initFailed);
-    return false;
-  }
-  _display->clearDisplay();
+	String initFailed = F("init() failed!");
+	if (!_display.init(&Wire, 0, 0x3C)) {
+		_displayErrorTimerLED.init(LED_BUILTIN);
+		_displayErrorTimerLED.setIntervals(4, (const uint16_t[]){ 50, 100, 150, 100 });
+		_displayErrorTimerLED.restart();
+		DLOGLN(initFailed);
+		return false;
+	}
+	_display->clearDisplay();
 
-  if (!_sensorTemp.init()) {
-    DLOGLN(initFailed);
-    return false;
-  }
-  
-  // Order should follow the order in DisplayLayouts
-  _dLayouts.push_back(std::make_unique<DLayoutWelcome>());
-  _dLayouts.push_back(std::make_unique<DLayoutMain>());
-  _dLayouts.push_back(std::make_unique<DLayoutGraph>());
-  _dLayouts.push_back(std::make_unique<DLayoutSettings>());
-  for (auto& dlayout : _dLayouts) {
-    if (!dlayout->init(&_display, this, &_btn1, &_btn2)) {
-      DLOGLN(initFailed);
-      return false;
-    }
-  }
+	if (!_sensorTemp.init()) {
+		DLOGLN(initFailed);
+		return false;
+	}
+	
+	// Order should follow the order in DisplayLayouts
+	_dLayouts.push_back(std::make_unique<DLayoutWelcome>());
+	_dLayouts.push_back(std::make_unique<DLayoutMain>());
+	_dLayouts.push_back(std::make_unique<DLayoutGraph>());
+	_dLayouts.push_back(std::make_unique<DLayoutSettings>());
+	for (auto& dlayout : _dLayouts) {
+		if (!dlayout->init(&_display, this, &_btn1, &_btn2)) {
+			DLOGLN(initFailed);
+			return false;
+		}
+	}
 
-  if (!_dltransMain.init(&_display, 200, DLTransition::Interpolation::APOW3)) {
-    return false;
-  }
+	if (!_dltransMain.init(&_display, 200, DLTransition::Interpolation::APOW3)) {
+		return false;
+	}
 
-  if (!_btn1.init(INTERACT_PUSHBUTTON_1_PIN)) {
-    DLOGLN(initFailed);
-    return false;
-  }
-  if (!_btn2.init(INTERACT_PUSHBUTTON_2_PIN)) {
-    DLOGLN(initFailed);
-    return false;
-  }
-  
-  _dLayouts[DisplayLayoutKeys::WELCOME]->draw();
-  delay(DISPLAY_LAYOUT_LOGO_DELAY);
-  activateDisplayLayout(DisplayLayoutKeys::MAIN, DLTransitionStyle::NONE);
-  
-  measureTemperature();
+	if (!_btn1.init(INTERACT_PUSHBUTTON_1_PIN)) {
+		DLOGLN(initFailed);
+		return false;
+	}
+	if (!_btn2.init(INTERACT_PUSHBUTTON_2_PIN)) {
+		DLOGLN(initFailed);
+		return false;
+	}
+	
+	_dLayouts[DisplayLayoutKeys::WELCOME]->draw();
+	delay(DISPLAY_LAYOUT_LOGO_DELAY);
 
-  return true;
+	measureTemperature();
+	activateDisplayLayout(DisplayLayoutKeys::MAIN, DLTransitionStyle::NONE);
+	
+	// ESP.deepSleep(5e6); /* Sleep for 5 seconds */
+
+	return true;
 }
 
 void Application::loop() {
-  if (_displayErrorTimerLED.isActive()) {
-    _displayErrorTimerLED.tick();
-  }
+	if (_displayErrorTimerLED.isActive()) {
+		_displayErrorTimerLED.tick();
+	}
 
-  _dltransMain.tick();
-  _btn1.tick();
-  _btn2.tick();
-  getActiveDisplayLayout()->tick();
+	_dltransMain.tick();
+	_btn1.tick();
+	_btn2.tick();
+	getActiveDisplayLayout()->tick();
 }
 
 void Application::activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransitionStyle style) {
-  if (dLayoutKey == _dLayoutActiveKey) {
-    return;
-  }
-  DisplayLayout* target = _dLayouts[dLayoutKey].get();
+	if (dLayoutKey == _dLayoutActiveKey) {
+		return;
+	}
+	DisplayLayout* target = _dLayouts[dLayoutKey].get();
 
-  Display::ScrollDir direction = Display::ScrollDir::LEFT;
-  switch (style) {
-    case DLTransitionStyle::AUTO: {
-      int8_t keyDst = dLayoutKey - _dLayoutActiveKey;
-      bool jump = abs(keyDst) > 1;
-      direction = ((keyDst < 0 && jump) || (keyDst > 0 && !jump)) ? Display::ScrollDir::LEFT : Display::ScrollDir::RIGHT;
-      break;
-    }
-    case DLTransitionStyle::RIGHT: {
-      direction = Display::ScrollDir::RIGHT;
-      break;
-    }
-  }
-  if (style == DLTransitionStyle::NONE) {
-    target->activate();
-  } else {
-    _dltransMain.start(getActiveDisplayLayout(), target, direction);
-  }
-  _dLayoutActiveKey = dLayoutKey;
+	Display::ScrollDir direction = Display::ScrollDir::LEFT;
+	switch (style) {
+		case DLTransitionStyle::AUTO: {
+			int8_t keyDst = dLayoutKey - _dLayoutActiveKey;
+			bool jump = abs(keyDst) > 1;
+			direction = ((keyDst < 0 && jump) || (keyDst > 0 && !jump)) ? Display::ScrollDir::LEFT : Display::ScrollDir::RIGHT;
+			break;
+		}
+		case DLTransitionStyle::RIGHT: {
+			direction = Display::ScrollDir::RIGHT;
+			break;
+		}
+	}
+	if (style == DLTransitionStyle::NONE) {
+		target->activate();
+	} else {
+		_dltransMain.start(getActiveDisplayLayout(), target, direction);
+	}
+	_dLayoutActiveKey = dLayoutKey;
 }
 
 /////////////////////////
@@ -108,13 +110,33 @@ void Application::activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransiti
 Application app;
 void setup() {
 #ifdef TDEBUG
-  Serial.begin(115200);
-  delay(1);
-  Serial.println();
+	Serial.begin(115200);
+	delay(1);
+	Serial.println();
 #endif
-  const bool setupSucceeded = app.setup();
-  DLOGLN(setupSucceeded);
+	const bool setupSucceeded = app.setup();
+	DLOGLN(setupSucceeded);
 }
 void loop() {
-  app.loop();
+	app.loop();
 }
+
+
+// //The setup function is called once at startup of the sketch
+// void setup() {
+//   Serial.begin(115200);
+//   while(!Serial) { }
+//   Serial.println();
+//   Serial.println("Start device in normal mode!");
+ 
+//   delay(5000);
+//   // Wait for serial to initialize.
+//   while(!Serial) { }
+ 
+//   // Deep sleep mode for 10 seconds, the ESP8266 wakes up by itself when GPIO 16 (D0 in NodeMCU board) is connected to the RESET pin
+//   Serial.println("I'm awake, but I'm going into deep sleep mode for 10 seconds");
+//   ESP.deepSleep(10e6);
+// }
+ 
+// void loop() {
+// }

@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #define TDEBUG
+#define SSD1306_NO_SPLASH
 
 static const int8_t DISPLAY_PIN_RESET = -1;
 
@@ -17,41 +18,41 @@ static const uint8_t INTERACT_PUSHBUTTON_2_PIN = 2; // D4
 static const char STORAGEKEY_CONFIG[] PROGMEM = "config";
 
 enum DisplayLayoutKeys {
-    WELCOME = 0,
-    MAIN,
-    GRAPH,
-    SETTINGS
+	WELCOME = 0,
+	MAIN,
+	GRAPH,
+	SETTINGS
 };
 enum DLTransitionStyle {
-    NONE = 0,
-    AUTO,
-    LEFT,
-    RIGHT
+	NONE = 0,
+	AUTO,
+	LEFT,
+	RIGHT
 };
 
 #ifdef TDEBUG
 #define __PRIVATE_LOG_PREAMBULE(txt)   do {\
-                                            Serial.print(__FILE__);\
-                                            Serial.print(F(":"));\
-                                            Serial.print(__LINE__);\
-                                            Serial.print(F(":"));\
-                                            Serial.print(__func__);\
-                                            Serial.print(F("() - "));\
-                                        } while(false)
+											Serial.print(__FILE__);\
+											Serial.print(F(":"));\
+											Serial.print(__LINE__);\
+											Serial.print(F(":"));\
+											Serial.print(__func__);\
+											Serial.print(F("() - "));\
+										} while(false)
 #define DLOGLN(txt)  do {\
-                        __PRIVATE_LOG_PREAMBULE(txt);\
-                        Serial.println(txt);\
-                    } while(false)
+						__PRIVATE_LOG_PREAMBULE(txt);\
+						Serial.println(txt);\
+					} while(false)
 #define DLOG(txt)    do {\
-                        __PRIVATE_LOG_PREAMBULE(txt);\
-                        Serial.print(txt);\
-                    } while(false)
+						__PRIVATE_LOG_PREAMBULE(txt);\
+						Serial.print(txt);\
+					} while(false)
 #define LOGLN(txt)  do {\
-                        Serial.println(txt);\
-                    } while(false)
+						Serial.println(txt);\
+					} while(false)
 #define LOG(txt)    do {\
-                        Serial.print(txt);\
-                    } while(false)
+						Serial.print(txt);\
+					} while(false)
 #else
 #define DLOGLN(txt) do {} while(false)
 #define DLOG(txt) do {} while(false)
