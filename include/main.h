@@ -23,8 +23,6 @@ class Application {
   PushButton _btn2;
   TempSensor _sensorTemp;
 
-  Timer _DEBUG_randomPixel;
-
   void measureTemperature();
   void showDisplayError();
 public:
@@ -32,7 +30,7 @@ public:
   void loop();
 
   inline DisplayLayout* getActiveDisplayLayout() { return _dLayouts[_dLayoutActiveKey].get(); }
-  void activateDisplayLayout(DisplayLayoutKeys dLayoutKey);
+  void activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransitionStyle style = DLTransitionStyle::AUTO);
 };
 
 #endif // MAIN_H__

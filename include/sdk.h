@@ -22,6 +22,12 @@ enum DisplayLayoutKeys {
     GRAPH,
     SETTINGS
 };
+enum DLTransitionStyle {
+    NONE = 0,
+    AUTO,
+    LEFT,
+    RIGHT
+};
 
 #ifdef TDEBUG
 #define __PRIVATE_LOG_PREAMBULE(txt)   do {\

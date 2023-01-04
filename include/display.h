@@ -4,6 +4,7 @@
 #include "sdk.h"
 #include "sensor.h"
 #include "interact.h"
+#include "utilities.h"
 
 #include <memory>
 
@@ -54,23 +55,12 @@ private:
     void scrollHorizontally(uint8_t amount, bool left, ScrollType scrollType, const uint8_t* src, uint8_t srcOffset);
 };
 
-class DisplayLayout {
-protected:
-    Display* _display;
-    Application* _app;
-    inline Display& display() { return *_display; }
-public:
-    DisplayLayout() = default;
-    bool init(Display* display, Application* app);
-    virtual void draw(bool doDisplay = true) { }
-    virtual void update(void* data) { }
-    virtual void input(PushButton& btn1, PushButton& btn2) { }
-};
-
+class DisplayLayout;
 class DLTransition {
 public:
     enum Interpolation {
-        LINEAR = 0
+        LINEAR = 0,
+        APOW3
     };
     DLTransition() = default;
     ~DLTransition();
@@ -96,7 +86,27 @@ private:
     // unsigned long _lastTickTimestamp = 0;
     bool _isRunning = false;
 
+    static float interpolate(float a, float b, float x, Interpolation style = Interpolation::LINEAR);
+    
     inline Display& display() const { return *_display; }
+};
+
+
+class DisplayLayout {
+protected:
+    Display* _display = nullptr;
+    Application* _app = nullptr;
+    PushButton* _btn1 = nullptr;
+    PushButton* _btn2 = nullptr;
+    inline Display& display() { return *_display; }
+public:
+    DisplayLayout() = default;
+    virtual bool init(Display* display, Application* app, PushButton* btn1, PushButton* btn2);
+    virtual void activate() { draw(); } // should be called when layout is entered
+    virtual void deactivate() { }
+    virtual void draw(bool doDisplay = true) { }
+    virtual void update(void* data) { }
+    virtual void tick() { }
 };
 
 class DLayoutWelcome : public DisplayLayout {
@@ -109,7 +119,7 @@ class DLayoutMain : public DisplayLayout {
 public:
     void draw(bool doDisplay = true) override;
     void update(void* data) override;
-    void input(PushButton& btn1, PushButton& btn2) override;
+    void tick() override;
 };
 
 class DLayoutGraph : public DisplayLayout {
@@ -117,15 +127,19 @@ class DLayoutGraph : public DisplayLayout {
 public:
     void draw(bool doDisplay = true) override;
     void update(void* data) override;
-    void input(PushButton& btn1, PushButton& btn2) override;
+    void tick() override;
 };
 
 class DLayoutSettings : public DisplayLayout {
     float _temp1;
+    Timer _timerRandomPixel;
 public:
+    bool init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) override;
     void draw(bool doDisplay = true) override;
+    void activate() override;
+    void deactivate() override;
     void update(void* data) override;
-    void input(PushButton& btn1, PushButton& btn2) override;
+    void tick() override;
 };
 
 #endif // DISPLAY_H__

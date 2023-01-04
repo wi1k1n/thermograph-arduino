@@ -93,6 +93,7 @@ void Display::scroll(uint8_t amount, ScrollDir dir, ScrollType scrollType, const
             scrollHorizontally(amount, false, scrollType, src, srcOffset);
             break;
         default:
+            // TODO: implement! (can be not easy due to memory layout)
             LOGLN(F("Vertical scroll is not implemented yet!"));
             break;
     }
@@ -137,11 +138,20 @@ void DLTransition::start(DisplayLayout* layoutFrom, DisplayLayout* layoutTo, Dis
     uint16_t bufferSize = _display->rawWidth() * _display->rawHeight() / _display->pixelDepth();
     _buffer = new uint8_t[bufferSize];
     
+    // TODO: memory manipulation should be encapsulated by Display class!!!
+
+    // temporarily save current buffer (because it may differ from what we get after draw(), but we also need to prerender layout2)
+    uint8_t* tempBuff = new uint8_t[bufferSize];
+    memcpy(tempBuff, display()->getBuffer(), bufferSize);
+
     // draw second layout first and move to _buffer
     _displayLayout2->draw(false);
-    memmove(_buffer, display()->getBuffer(), bufferSize);
-    // draw second layout and keep it in display
-    _displayLayout1->draw(false);
+    memcpy(_buffer, display()->getBuffer(), bufferSize);
+
+    memcpy(display()->getBuffer(), tempBuff, bufferSize);
+    delete[] tempBuff;
+
+    _displayLayout1->deactivate();
     
     _startedTimestamp = millis();
     tick();
@@ -150,12 +160,25 @@ void DLTransition::stop() {
     _isRunning = false;
     delete[] _buffer;
 }
+
+float DLTransition::interpolate(float a, float b, float x, Interpolation style) {
+    float t = 0;
+    switch (style) {
+        case Interpolation::APOW3:
+            t = a + (b - a) * powf(x, 1.f / 3.f);
+            break;
+        default:
+            t = a + x * (b - a);
+            break;
+    }
+    return constrain(t, a, b);
+}
 void DLTransition::tick() {
     if (!isRunning()) {
         return;
     }
     unsigned long curTime = millis();
-    float t = (float)(curTime - _startedTimestamp) / _duration;
+    float t = interpolate(0.f, 1.f, (float)(curTime - _startedTimestamp) / _duration, _interpolation);
     // amount - how far current buffer should be shifted at current millis() time
     uint8_t amount = min(static_cast<uint8_t>(t * _display->rawWidth()), _display->rawWidth());
     // how much more buffers should be shifted considering their current shift
@@ -171,22 +194,25 @@ void DLTransition::tick() {
     _curBuffersShift += amountForCurBuffers;
     if (curTime - _startedTimestamp >= _duration) {
         stop();
-        _displayLayout2->draw();
+        _displayLayout2->activate();
         return;
     }
 }
 
 
-bool DisplayLayout::init(Display* display, Application* app) {
-    if (!display || !app)
+bool DisplayLayout::init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) {
+    if (!display || !app || !btn1 || !btn2)
         return false;
     _display = display;
     _app = app;
+    _btn1 = btn1;
+    _btn2 = btn2;
     return true;
 }
 
 void DLayoutWelcome::draw(bool doDisplay) {
-    DLOGLN();
+    DisplayLayout::draw(doDisplay);
+    // DLOGLN();
     display()->clearDisplay();
 
     display()->drawBitmap(0, 0, static_cast<const uint8_t*>(logoData), LOGO_WIDTH, LOGO_HEIGHT, DISPLAY_WHITE);
@@ -197,21 +223,24 @@ void DLayoutWelcome::draw(bool doDisplay) {
 }
 
 void DLayoutMain::update(void* data) {
+    DisplayLayout::draw(data);
     TempSensorData* tempData = static_cast<TempSensorData*>(data);
     _temp1 = tempData->temp;
 }
-void DLayoutMain::input(PushButton& btn1, PushButton& btn2) {
-    if (btn1.click()) {
+void DLayoutMain::tick() {
+    DisplayLayout::tick();
+    if (_btn1->click()) {
         _app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
         return;
     }
-    if (btn2.click()) {
+    if (_btn2->click()) {
         _app->activateDisplayLayout(DisplayLayoutKeys::GRAPH);
         return;
     }
 }
 void DLayoutMain::draw(bool doDisplay) {
-    DLOGLN();
+    DisplayLayout::draw(doDisplay);
+    // DLOGLN();
     display()->clearDisplay();
 
     display()->setTextColor(DISPLAY_WHITE);
@@ -238,20 +267,22 @@ void DLayoutMain::draw(bool doDisplay) {
 
 
 void DLayoutGraph::update(void* data) {
-
+    DisplayLayout::update(data);
 }
-void DLayoutGraph::input(PushButton& btn1, PushButton& btn2) {
-    if (btn1.click()) {
+void DLayoutGraph::tick() {
+    DisplayLayout::tick();
+    if (_btn1->click()) {
         _app->activateDisplayLayout(DisplayLayoutKeys::MAIN);
         return;
     }
-    if (btn2.click()) {
+    if (_btn2->click()) {
         _app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
         return;
     }
 }
 void DLayoutGraph::draw(bool doDisplay) {
-    DLOGLN();
+    DisplayLayout::draw(doDisplay);
+    // DLOGLN();
     display()->clearDisplay();
     
     display()->setCursor(0, 0);
@@ -263,21 +294,42 @@ void DLayoutGraph::draw(bool doDisplay) {
     }
 }
 
-void DLayoutSettings::update(void* data) {
-
+bool DLayoutSettings::init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) {
+    DisplayLayout::init(display, app, btn1, btn2);
+    return _timerRandomPixel.init(120, Timer::MODE::PERIOD);
 }
-void DLayoutSettings::input(PushButton& btn1, PushButton& btn2) {
-    if (btn1.click()) {
+void DLayoutSettings::update(void* data) {
+    DisplayLayout::update(data);
+}
+void DLayoutSettings::activate() {
+    DisplayLayout::activate();
+    _timerRandomPixel.start();
+}
+void DLayoutSettings::deactivate() {
+    DisplayLayout::deactivate();
+    _timerRandomPixel.stop();
+}
+void DLayoutSettings::tick() {
+    DisplayLayout::tick();
+    if (_timerRandomPixel.tick()) {
+        int16_t x = random(display()->width()),
+                y = random(display()->height());
+        display()->drawPixel(x, y, DISPLAY_WHITE);
+        display()->display();
+    }
+
+    if (_btn1->click()) {
         _app->activateDisplayLayout(DisplayLayoutKeys::GRAPH);
         return;
     }
-    if (btn2.click()) {
+    if (_btn2->click()) {
         _app->activateDisplayLayout(DisplayLayoutKeys::MAIN);
         return;
     }
 }
 void DLayoutSettings::draw(bool doDisplay) {
-    DLOGLN();
+    DisplayLayout::draw(doDisplay);
+    // DLOGLN();
     display()->clearDisplay();
     
     display()->setCursor(0, 0);

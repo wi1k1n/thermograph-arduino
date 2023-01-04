@@ -37,13 +37,13 @@ bool Application::setup() {
   _dLayouts.push_back(std::make_unique<DLayoutGraph>());
   _dLayouts.push_back(std::make_unique<DLayoutSettings>());
   for (auto& dlayout : _dLayouts) {
-    if (!dlayout->init(&_display, this)) {
+    if (!dlayout->init(&_display, this, &_btn1, &_btn2)) {
       DLOGLN(initFailed);
       return false;
     }
   }
 
-  if (!_dltransMain.init(&_display)) {
+  if (!_dltransMain.init(&_display, 200, DLTransition::Interpolation::APOW3)) {
     return false;
   }
 
@@ -55,18 +55,12 @@ bool Application::setup() {
     DLOGLN(initFailed);
     return false;
   }
-
-  if (!_DEBUG_randomPixel.init(120, Timer::MODE::PERIOD)) {
-    DLOGLN(initFailed);
-    return false;
-  }
   
   _dLayouts[DisplayLayoutKeys::WELCOME]->draw();
   delay(DISPLAY_LAYOUT_LOGO_DELAY);
-  activateDisplayLayout(DisplayLayoutKeys::MAIN);
+  activateDisplayLayout(DisplayLayoutKeys::MAIN, DLTransitionStyle::NONE);
   
   measureTemperature();
-  _DEBUG_randomPixel.start();
 
   return true;
 }
@@ -77,32 +71,35 @@ void Application::loop() {
   }
 
   _dltransMain.tick();
-
-  if (_btn1.tick() || _btn2.tick()) {
-    if (_btn1.tick())
-      DLOGLN(F("btn1 tick"));
-    if (_btn2.tick())
-      DLOGLN(F("btn2 tick"));
-    getActiveDisplayLayout()->input(_btn1, _btn2);
-  }
-
-  if (_DEBUG_randomPixel.tick()) {
-    int16_t x = random(_display->width()),
-            y = random(_display->height());
-    _display->drawPixel(x, y, DISPLAY_WHITE);
-    _display->display();
-  }
+  _btn1.tick();
+  _btn2.tick();
+  getActiveDisplayLayout()->tick();
 }
 
-void Application::activateDisplayLayout(DisplayLayoutKeys dLayoutKey) {
+void Application::activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransitionStyle style) {
   if (dLayoutKey == _dLayoutActiveKey) {
     return;
   }
   DisplayLayout* target = _dLayouts[dLayoutKey].get();
-  int8_t keyDst = dLayoutKey - _dLayoutActiveKey;
-  bool jump = abs(keyDst) > 1;
-  Display::ScrollDir direction = ((keyDst < 0 && jump) || (keyDst > 0 && !jump)) ? Display::ScrollDir::LEFT : Display::ScrollDir::RIGHT;
-  _dltransMain.start(getActiveDisplayLayout(), target, direction);
+
+  Display::ScrollDir direction = Display::ScrollDir::LEFT;
+  switch (style) {
+    case DLTransitionStyle::AUTO: {
+      int8_t keyDst = dLayoutKey - _dLayoutActiveKey;
+      bool jump = abs(keyDst) > 1;
+      direction = ((keyDst < 0 && jump) || (keyDst > 0 && !jump)) ? Display::ScrollDir::LEFT : Display::ScrollDir::RIGHT;
+      break;
+    }
+    case DLTransitionStyle::RIGHT: {
+      direction = Display::ScrollDir::RIGHT;
+      break;
+    }
+  }
+  if (style == DLTransitionStyle::NONE) {
+    target->activate();
+  } else {
+    _dltransMain.start(getActiveDisplayLayout(), target, direction);
+  }
   _dLayoutActiveKey = dLayoutKey;
 }
 
