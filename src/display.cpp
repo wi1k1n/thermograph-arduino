@@ -1,6 +1,7 @@
 #include "sdk.h"
 #include "display.h"
 #include "logo.h"
+#include "main.h"
 
 Display::~Display() {
     disable();
@@ -99,9 +100,6 @@ void Display::scroll(uint8_t amount, ScrollDir dir, ScrollType scrollType, const
 
 /////////////////////
 
-
-// DLTransition::DLTransition(Display& display, DisplayLayout& layoutFrom, DisplayLayout& layoutTo, uint16_t duration, Display::ScrollDir direction, Interpolation interpolation)
-// : _display(display), _displayLayout1(layoutFrom), _displayLayout2(layoutTo), _duration(duration), _direction(direction), _interpolation(interpolation) { }
 DLTransition::~DLTransition() {
     delete[] _buffer;
 }
@@ -118,9 +116,6 @@ bool DLTransition::init(Display* display, uint16_t duration, Interpolation inter
 }
 
 void DLTransition::start(DisplayLayout* layoutFrom, DisplayLayout* layoutTo, Display::ScrollDir direction) {
-    if (isRunning()) {
-        return;
-    }
     if (!layoutFrom || !layoutTo) {
         DLOGLN(F("layoutFrom or layoutTo is nullptr! Abroted."));
         return;
@@ -128,6 +123,9 @@ void DLTransition::start(DisplayLayout* layoutFrom, DisplayLayout* layoutTo, Dis
     if (!_display) {
         DLOGLN(F("_display is nullptr! Abroted."));
         return;
+    }
+    if (isRunning()) {
+        stop();
     }
     
     _displayLayout1 = layoutFrom;
@@ -146,7 +144,6 @@ void DLTransition::start(DisplayLayout* layoutFrom, DisplayLayout* layoutTo, Dis
     _displayLayout1->draw(false);
     
     _startedTimestamp = millis();
-    // _lastTickTimestamp = _startedTimestamp;
     tick();
 }
 void DLTransition::stop() {
@@ -180,16 +177,20 @@ void DLTransition::tick() {
 }
 
 
-bool DisplayLayout::init(Display* display) {
-    if (!display)
+bool DisplayLayout::init(Display* display, Application* app) {
+    if (!display || !app)
         return false;
     _display = display;
+    _app = app;
     return true;
 }
 
 void DLayoutWelcome::draw(bool doDisplay) {
+    DLOGLN();
     display()->clearDisplay();
+
     display()->drawBitmap(0, 0, static_cast<const uint8_t*>(logoData), LOGO_WIDTH, LOGO_HEIGHT, DISPLAY_WHITE);
+
     if (doDisplay) {
         display()->display();
     }
@@ -199,8 +200,20 @@ void DLayoutMain::update(void* data) {
     TempSensorData* tempData = static_cast<TempSensorData*>(data);
     _temp1 = tempData->temp;
 }
+void DLayoutMain::input(PushButton& btn1, PushButton& btn2) {
+    if (btn1.click()) {
+        _app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
+        return;
+    }
+    if (btn2.click()) {
+        _app->activateDisplayLayout(DisplayLayoutKeys::GRAPH);
+        return;
+    }
+}
 void DLayoutMain::draw(bool doDisplay) {
+    DLOGLN();
     display()->clearDisplay();
+
     display()->setTextColor(DISPLAY_WHITE);
 
     char buffer[16];
@@ -217,6 +230,59 @@ void DLayoutMain::draw(bool doDisplay) {
     display()->setCursor(0, 0);
     display()->setTextSize(1);
     display()->print(F("Thermograph v2"));
+
+    if (doDisplay) {
+        display()->display();
+    }
+}
+
+
+void DLayoutGraph::update(void* data) {
+
+}
+void DLayoutGraph::input(PushButton& btn1, PushButton& btn2) {
+    if (btn1.click()) {
+        _app->activateDisplayLayout(DisplayLayoutKeys::MAIN);
+        return;
+    }
+    if (btn2.click()) {
+        _app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
+        return;
+    }
+}
+void DLayoutGraph::draw(bool doDisplay) {
+    DLOGLN();
+    display()->clearDisplay();
+    
+    display()->setCursor(0, 0);
+    display()->setTextSize(1);
+    display()->print(F("Graph Layout"));
+
+    if (doDisplay) {
+        display()->display();
+    }
+}
+
+void DLayoutSettings::update(void* data) {
+
+}
+void DLayoutSettings::input(PushButton& btn1, PushButton& btn2) {
+    if (btn1.click()) {
+        _app->activateDisplayLayout(DisplayLayoutKeys::GRAPH);
+        return;
+    }
+    if (btn2.click()) {
+        _app->activateDisplayLayout(DisplayLayoutKeys::MAIN);
+        return;
+    }
+}
+void DLayoutSettings::draw(bool doDisplay) {
+    DLOGLN();
+    display()->clearDisplay();
+    
+    display()->setCursor(0, 0);
+    display()->setTextSize(1);
+    display()->print(F("Settings Layout"));
 
     if (doDisplay) {
         display()->display();

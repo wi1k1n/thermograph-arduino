@@ -3,6 +3,7 @@
 
 #include "sdk.h"
 #include "sensor.h"
+#include "interact.h"
 
 #include <memory>
 
@@ -14,6 +15,7 @@
 #define DISPLAY_WHITE WHITE
 #define DISPLAY_BLACK BLACK
 
+class Application;
 class Display {
 public:
     enum ScrollType {
@@ -55,24 +57,14 @@ private:
 class DisplayLayout {
 protected:
     Display* _display;
+    Application* _app;
     inline Display& display() { return *_display; }
 public:
     DisplayLayout() = default;
-    bool init(Display* display);
+    bool init(Display* display, Application* app);
     virtual void draw(bool doDisplay = true) { }
     virtual void update(void* data) { }
-};
-
-class DLayoutWelcome : public DisplayLayout {
-public:
-    void draw(bool doDisplay = true) override;
-};
-
-class DLayoutMain : public DisplayLayout {
-    float _temp1;
-public:
-    void draw(bool doDisplay = true) override;
-    void update(void* data) override;
+    virtual void input(PushButton& btn1, PushButton& btn2) { }
 };
 
 class DLTransition {
@@ -105,6 +97,35 @@ private:
     bool _isRunning = false;
 
     inline Display& display() const { return *_display; }
+};
+
+class DLayoutWelcome : public DisplayLayout {
+public:
+    void draw(bool doDisplay = true) override;
+};
+
+class DLayoutMain : public DisplayLayout {
+    float _temp1;
+public:
+    void draw(bool doDisplay = true) override;
+    void update(void* data) override;
+    void input(PushButton& btn1, PushButton& btn2) override;
+};
+
+class DLayoutGraph : public DisplayLayout {
+    float _temp1;
+public:
+    void draw(bool doDisplay = true) override;
+    void update(void* data) override;
+    void input(PushButton& btn1, PushButton& btn2) override;
+};
+
+class DLayoutSettings : public DisplayLayout {
+    float _temp1;
+public:
+    void draw(bool doDisplay = true) override;
+    void update(void* data) override;
+    void input(PushButton& btn1, PushButton& btn2) override;
 };
 
 #endif // DISPLAY_H__

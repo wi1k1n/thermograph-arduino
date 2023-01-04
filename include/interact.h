@@ -2,7 +2,6 @@
 #define INTERACT_H__
 
 #include "VirtualButton.h"
-#include "display.h"
 
 #define PUSHBUTTON_PIN_UNASSIGNED 0xff
 
