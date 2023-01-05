@@ -4,10 +4,10 @@
 #include "Arduino.h"
 #include "sdk.h"
 #include "display.h"
+#include "display_layout.h"
 #include "sensor.h"
 #include "interact.h"
 #include "utilities.h"
-#include "TimerLED.h"
 #include <vector>
 #include <memory>
 
@@ -22,7 +22,6 @@ class Application {
 
 	Display _display;
 	DLTransition _dltransMain;
-	TimerLED _displayErrorTimerLED;
 
 	std::vector<std::unique_ptr<DisplayLayout>> _dLayouts;
 	DisplayLayoutKeys _dLayoutActiveKey = DisplayLayoutKeys::NONE;

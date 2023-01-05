@@ -22,4 +22,18 @@ public:
 	}
 };
 
+template <typename T>
+struct Point2 {
+	T x;
+	T y;
+	Point2() : x(T()), y(T()) { }
+	Point2(T v) : x(v), y(v) { }
+	Point2(T x, T y) : x(x), y(y) { }
+};
+typedef Point2<int16_t> Point;
+typedef Point2<uint16_t> UPoint;
+typedef Point2<int8_t> Point8_t;
+typedef Point2<uint8_t> UPoint8_t;
+typedef Point2<float> PointF;
+
 #endif // UTILITIES_H__

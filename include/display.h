@@ -2,9 +2,7 @@
 #define DISPLAY_H__
 
 #include "sdk.h"
-#include "sensor.h"
-#include "interact.h"
-#include "utilities.h"
+#include "TimerLED.h"
 
 #include <memory>
 
@@ -15,6 +13,8 @@
 
 #define DISPLAY_WHITE WHITE
 #define DISPLAY_BLACK BLACK
+#define DISPLAY_FONT_WIDTH 6
+#define DISPLAY_FONT_HEIGHT 8
 
 class Application;
 class Display {
@@ -36,6 +36,7 @@ public:
 	~Display();
 	bool init(TwoWire* wire, uint8_t rst, uint8_t addr);
 	void disable();
+	void tick();
 
 	Adafruit_SSD1306* operator->();
 	void scroll(uint8_t amount = 1,
@@ -50,6 +51,7 @@ public:
 	inline uint8_t pixelDepth() const { return 8; } // in bits
 private:
 	std::unique_ptr<Adafruit_SSD1306> _display;
+	TimerLED _timerLEDError;
 	bool _available = false;
 
 	void scrollHorizontally(uint8_t amount, bool left, ScrollType scrollType, const uint8_t* src, uint8_t srcOffset);
@@ -89,70 +91,6 @@ private:
 	static float interpolate(float a, float b, float x, Interpolation style = Interpolation::LINEAR);
 	
 	inline Display& display() const { return *_display; }
-};
-
-
-class DisplayLayout {
-protected:
-	Display* _display = nullptr;
-	Application* _app = nullptr;
-	PushButton* _btn1 = nullptr;
-	PushButton* _btn2 = nullptr;
-	inline Display& display() { return *_display; }
-public:
-	DisplayLayout() = default;
-	virtual bool init(Display* display, Application* app, PushButton* btn1, PushButton* btn2);
-	virtual void activate() { draw(); } // should be called when layout is entered
-	virtual void deactivate() { }
-	virtual void draw(bool doDisplay = true) { }
-	virtual void update(void* data) { }
-	virtual void tick() { }
-};
-
-class DLayoutWelcome : public DisplayLayout {
-	Timer _timer;
-public:
-	bool init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) override;
-	void draw(bool doDisplay = true) override;
-	void activate() override;
-	void deactivate() override;
-	void update(void* data) override;
-	void tick() override;
-};
-
-class DLayoutBackgroundInterrupted : public DisplayLayout {
-public:
-	void draw(bool doDisplay = true) override;
-	void tick() override;
-};
-
-// Menu layouts
-class DLayoutMain : public DisplayLayout {
-	float _temp1;
-public:
-	void draw(bool doDisplay = true) override;
-	void update(void* data) override;
-	void tick() override;
-};
-
-class DLayoutGraph : public DisplayLayout {
-	float _temp1;
-public:
-	void draw(bool doDisplay = true) override;
-	void update(void* data) override;
-	void tick() override;
-};
-
-class DLayoutSettings : public DisplayLayout {
-	float _temp1;
-	Timer _timerRandomPixel;
-public:
-	bool init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) override;
-	void draw(bool doDisplay = true) override;
-	void activate() override;
-	void deactivate() override;
-	void update(void* data) override;
-	void tick() override;
 };
 
 #endif // DISPLAY_H__

@@ -1,7 +1,6 @@
 #include "sdk.h"
 #include "display.h"
-#include "logo.h"
-#include "main.h"
+#include "display_layout.h"
 
 Display::~Display() {
 	disable();
@@ -9,14 +8,13 @@ Display::~Display() {
 
 bool Display::init(TwoWire* wire, uint8_t rst, uint8_t addr) {
 	_display = std::unique_ptr<Adafruit_SSD1306>(new Adafruit_SSD1306(rawWidth(), rawHeight(), wire, rst));
-	if (_display == nullptr) {
+	if (_display == nullptr || !_display->begin(SSD1306_SWITCHCAPVCC, addr)) {
+		_timerLEDError.init(LED_BUILTIN);
+		_timerLEDError.setIntervals(4, (const uint16_t[]){ 50, 100, 150, 100 });
+		_timerLEDError.restart();
 		return false;
 	}
-	_available = _display->begin(SSD1306_SWITCHCAPVCC, addr);
-	if (!_available) {
-		return false;
-	}
-
+	_available = true;
 	_display->cp437(true);
 
 	return true;
@@ -24,6 +22,10 @@ bool Display::init(TwoWire* wire, uint8_t rst, uint8_t addr) {
 void Display::disable() {
 	_display.reset();
 	_available = false;
+}
+void Display::tick() {
+	if (_timerLEDError.isActive())
+		_timerLEDError.tick();
 }
 
 Adafruit_SSD1306* Display::operator->() {
@@ -196,191 +198,5 @@ void DLTransition::tick() {
 		stop();
 		_displayLayout2->activate();
 		return;
-	}
-}
-
-
-bool DisplayLayout::init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) {
-	if (!display || !app || !btn1 || !btn2)
-		return false;
-	_display = display;
-	_app = app;
-	_btn1 = btn1;
-	_btn2 = btn2;
-	return true;
-}
-
-bool DLayoutWelcome::init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) {
-	DisplayLayout::init(display, app, btn1, btn2);
-	return _timer.init(DISPLAY_LAYOUT_LOGO_DELAY, Timer::MODE::TIMER);
-}
-void DLayoutWelcome::update(void* data) {
-	DisplayLayout::update(data);
-}
-void DLayoutWelcome::activate() {
-	DisplayLayout::activate();
-	_timer.start();
-}
-void DLayoutWelcome::deactivate() {
-	DisplayLayout::deactivate();
-	_timer.stop();
-}
-void DLayoutWelcome::tick() {
-	DisplayLayout::tick();
-	_btn1->reset();
-	_btn2->reset();
-	if (_timer.tick()) {
-		_app->activateDisplayLayout(DisplayLayoutKeys::MAIN, DLTransitionStyle::NONE);
-	}
-}
-void DLayoutWelcome::draw(bool doDisplay) {
-	DisplayLayout::draw(doDisplay);
-	// DLOGLN();
-	display()->clearDisplay();
-
-	display()->drawBitmap(0, 0, static_cast<const uint8_t*>(logoData), LOGO_WIDTH, LOGO_HEIGHT, DISPLAY_WHITE);
-
-	if (doDisplay) {
-		display()->display();
-	}
-}
-
-void DLayoutBackgroundInterrupted::draw(bool doDisplay) {
-	DisplayLayout::draw(doDisplay);
-	DLOGLN();
-	display()->clearDisplay();
-
-	display()->setTextColor(DISPLAY_WHITE);
-	display()->setCursor(0, DISPLAY_LAYOUT_PADDING_TOP);
-	display()->setTextSize(2);
-	display()->print(F("Interrupted!"));
-
-	if (doDisplay) {
-		display()->display();
-	}
-}
-void DLayoutBackgroundInterrupted::tick() {
-	DisplayLayout::tick();
-	_btn1->reset();
-	_btn2->reset();
-}
-
-void DLayoutMain::update(void* data) {
-	DisplayLayout::draw(data);
-	TempSensorData* tempData = static_cast<TempSensorData*>(data);
-	_temp1 = tempData->temp;
-}
-void DLayoutMain::tick() {
-	DisplayLayout::tick();
-	if (_btn1->click()) {
-		_app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
-		return;
-	}
-	if (_btn2->click()) {
-		_app->activateDisplayLayout(DisplayLayoutKeys::GRAPH);
-		return;
-	}
-}
-void DLayoutMain::draw(bool doDisplay) {
-	DisplayLayout::draw(doDisplay);
-	// DLOGLN();
-	display()->clearDisplay();
-
-	display()->setTextColor(DISPLAY_WHITE);
-
-	char buffer[16];
-	dtostrf(_temp1, 6, 2, buffer);
-	
-	display()->setCursor(0, DISPLAY_LAYOUT_PADDING_TOP);
-	display()->setTextSize(3);
-	display()->print(buffer);
-
-	display()->setCursor(display()->getCursorX(), display()->getCursorY() - 4);
-	display()->setTextSize(2);
-	display()->print(F("o"));
-	
-	display()->setCursor(0, 0);
-	display()->setTextSize(1);
-	display()->print(F("Thermograph v2"));
-
-	if (doDisplay) {
-		display()->display();
-	}
-}
-
-
-void DLayoutGraph::update(void* data) {
-	DisplayLayout::update(data);
-}
-void DLayoutGraph::tick() {
-	DisplayLayout::tick();
-	if (_btn1->click()) {
-		_app->activateDisplayLayout(DisplayLayoutKeys::MAIN);
-		return;
-	}
-	if (_btn2->click()) {
-		_app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
-		return;
-	}
-}
-void DLayoutGraph::draw(bool doDisplay) {
-	DisplayLayout::draw(doDisplay);
-	// DLOGLN();
-	display()->clearDisplay();
-	
-	display()->setCursor(0, 0);
-	display()->setTextSize(1);
-	display()->print(F("Graph Layout"));
-
-	if (doDisplay) {
-		display()->display();
-	}
-}
-
-bool DLayoutSettings::init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) {
-	DisplayLayout::init(display, app, btn1, btn2);
-	return _timerRandomPixel.init(120, Timer::MODE::PERIOD);
-}
-void DLayoutSettings::update(void* data) {
-	DisplayLayout::update(data);
-}
-void DLayoutSettings::activate() {
-	DisplayLayout::activate();
-	_timerRandomPixel.start();
-}
-void DLayoutSettings::deactivate() {
-	DisplayLayout::deactivate();
-	_timerRandomPixel.stop();
-}
-void DLayoutSettings::tick() {
-	DisplayLayout::tick();
-	if (_timerRandomPixel.tick()) {
-		int16_t x = random(display()->width()),
-				y = random(display()->height());
-		uint16_t clr = display()->getPixel(x, y) ? DISPLAY_BLACK : DISPLAY_WHITE;
-		display()->drawPixel(x, y, clr);
-		display()->display();
-	}
-
-	if (_btn1->click()) {
-		_app->activateDisplayLayout(DisplayLayoutKeys::GRAPH);
-		return;
-	}
-	if (_btn2->click()) {
-		_app->activateDisplayLayout(DisplayLayoutKeys::MAIN);
-		return;
-	}
-}
-void DLayoutSettings::draw(bool doDisplay) {
-	DisplayLayout::draw(doDisplay);
-	// DLOGLN();
-	display()->clearDisplay();
-	
-	display()->setCursor(0, 0);
-	display()->setTextSize(1);
-	display()->print(F("Settings Layout"));
-
-	if (doDisplay) {
-		display()->display();
 	}
 }

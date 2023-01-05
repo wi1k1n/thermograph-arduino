@@ -63,12 +63,8 @@ bool Application::setup() {
 
 	if (isInteractionAvailable()) {
 		// Init display at first place as this is must have in user interaction mode
-		if (!_display.init(&Wire, 0, 0x3C)) {
-			_displayErrorTimerLED.init(LED_BUILTIN);
-			_displayErrorTimerLED.setIntervals(4, (const uint16_t[]){ 50, 100, 150, 100 });
-			_displayErrorTimerLED.restart();
+		if (!_display.init(&Wire, 0, 0x3C))
 			return false;
-		}
 		DLOGLN(F("Display initialized"));
 		_display->clearDisplay();
 		
@@ -81,12 +77,6 @@ bool Application::setup() {
 		_dLayouts[DisplayLayoutKeys::GRAPH].reset(new DLayoutGraph);
 		_dLayouts[DisplayLayoutKeys::SETTINGS].reset(new DLayoutSettings);
 
-		// _dLayouts.push_back(std::make_unique<DLayoutWelcome>());
-		// _dLayouts.push_back(std::make_unique<DLayoutBackgroundInterrupted>());
-		// // Menu layouts
-		// _dLayouts.push_back(std::make_unique<DLayoutMain>());
-		// _dLayouts.push_back(std::make_unique<DLayoutGraph>());
-		// _dLayouts.push_back(std::make_unique<DLayoutSettings>());
 		for (auto& dlayout : _dLayouts) {
 			if (!dlayout->init(&_display, this, &_btn1, &_btn2))
 				return false;
@@ -113,10 +103,7 @@ bool Application::setup() {
 }
 
 void Application::loop() {
-	if (_displayErrorTimerLED.isActive()) {
-		_displayErrorTimerLED.tick();
-	}
-
+	_display.tick();
 	_btn1.tick();
 	_btn2.tick();
 
