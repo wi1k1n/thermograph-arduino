@@ -6,8 +6,8 @@
 class Timer : public TimerMs {
 public:
 	enum MODE {
-		PERIOD = 0,
-		TIMER = 1
+		PERIOD = 0, // repeats
+		TIMER = 1	// triggers once
 	};
 
 	Timer() = default;

@@ -210,6 +210,29 @@ bool DisplayLayout::init(Display* display, Application* app, PushButton* btn1, P
 	return true;
 }
 
+bool DLayoutWelcome::init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) {
+	DisplayLayout::init(display, app, btn1, btn2);
+	return _timer.init(DISPLAY_LAYOUT_LOGO_DELAY, Timer::MODE::TIMER);
+}
+void DLayoutWelcome::update(void* data) {
+	DisplayLayout::update(data);
+}
+void DLayoutWelcome::activate() {
+	DisplayLayout::activate();
+	_timer.start();
+}
+void DLayoutWelcome::deactivate() {
+	DisplayLayout::deactivate();
+	_timer.stop();
+}
+void DLayoutWelcome::tick() {
+	DisplayLayout::tick();
+	_btn1->reset();
+	_btn2->reset();
+	if (_timer.tick()) {
+		_app->activateDisplayLayout(DisplayLayoutKeys::MAIN, DLTransitionStyle::NONE);
+	}
+}
 void DLayoutWelcome::draw(bool doDisplay) {
 	DisplayLayout::draw(doDisplay);
 	// DLOGLN();
@@ -220,6 +243,26 @@ void DLayoutWelcome::draw(bool doDisplay) {
 	if (doDisplay) {
 		display()->display();
 	}
+}
+
+void DLayoutBackgroundInterrupted::draw(bool doDisplay) {
+	DisplayLayout::draw(doDisplay);
+	DLOGLN();
+	display()->clearDisplay();
+
+	display()->setTextColor(DISPLAY_WHITE);
+	display()->setCursor(0, DISPLAY_LAYOUT_PADDING_TOP);
+	display()->setTextSize(2);
+	display()->print(F("Interrupted!"));
+
+	if (doDisplay) {
+		display()->display();
+	}
+}
+void DLayoutBackgroundInterrupted::tick() {
+	DisplayLayout::tick();
+	_btn1->reset();
+	_btn2->reset();
 }
 
 void DLayoutMain::update(void* data) {

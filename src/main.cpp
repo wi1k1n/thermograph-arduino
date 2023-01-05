@@ -1,10 +1,14 @@
 #include "main.h"
+#include "filesystem.h"
 
 void Application::measureTemperature() {
+	// TODO: refactor in a proper way
 	if (_sensorTemp.measure()) {
 		TempSensorData* dataPtr = static_cast<TempSensorData*>(_sensorTemp.waitForMeasurement());
 		if (dataPtr) {
-			_dLayouts[DisplayLayoutKeys::MAIN]->update(dataPtr);
+			if (isInteractionAvailable()) {
+				_dLayouts[DisplayLayoutKeys::MAIN]->update(dataPtr);
+			}
 			LOG(F("Temperature: "));
 			LOGLN(dataPtr->temp);
 		} else {
@@ -16,53 +20,94 @@ void Application::measureTemperature() {
 }
 
 bool Application::setup() {
-	String initFailed = F("init() failed!");
-	if (!_display.init(&Wire, 0, 0x3C)) {
-		_displayErrorTimerLED.init(LED_BUILTIN);
-		_displayErrorTimerLED.setIntervals(4, (const uint16_t[]){ 50, 100, 150, 100 });
-		_displayErrorTimerLED.restart();
-		DLOGLN(initFailed);
-		return false;
-	}
-	_display->clearDisplay();
+	// TODO: Serial is only for debugging purposes for now
+	#ifdef TDEBUG
+		Serial.begin(115200);
+		delay(1);
+		Serial.println();
+	#endif
+	DLOGLN(F("Welcome to Thermograph v2"));
 
-	if (!_sensorTemp.init()) {
-		DLOGLN(initFailed);
+	if (!Storage::init()) {
 		return false;
 	}
+	DLOGLN(F("Storage manager initialized"));
+
+	if (!_btn1.init(INTERACT_PUSHBUTTON_1_PIN))
+		return false;
+	if (!_btn2.init(INTERACT_PUSHBUTTON_2_PIN))
+		return false;
+	DLOGLN(F("Buttons initialized"));
 	
-	// Order should follow the order in DisplayLayouts
-	_dLayouts.push_back(std::make_unique<DLayoutWelcome>());
-	_dLayouts.push_back(std::make_unique<DLayoutMain>());
-	_dLayouts.push_back(std::make_unique<DLayoutGraph>());
-	_dLayouts.push_back(std::make_unique<DLayoutSettings>());
-	for (auto& dlayout : _dLayouts) {
-		if (!dlayout->init(&_display, this, &_btn1, &_btn2)) {
-			DLOGLN(initFailed);
-			return false;
+	// If not sleeping -> INTERACT mode
+	if (!Storage::isSleeping()) {
+		_mode = Mode::INTERACT;
+#ifdef TDEBUG
+		delay(MODE_DETECTION_DELAY);
+		if (_btn1.tick() && !_btn2.tick()) {
+			DLOGLN(F("[DEBUG] FORCED TO ENTER BACKGROUND_INTERRUPTED MODE!"));
+			_mode = Mode::BACKGROUND_INTERRUPTED;
+		}
+#endif
+	} else {
+		DLOG(F("Storage manager: isSleeping() == true"));
+		// Decide what mode are we loading in
+		delay(MODE_DETECTION_DELAY);
+		if (_btn1.tick() && _btn2.tick()) {
+			DLOG(F("Button1 and Button2: pressed"));
+			_mode = Mode::BACKGROUND_INTERRUPTED;
 		}
 	}
+	DLOG(F("Mode: "));
+	LOGLN(_mode);
 
-	if (!_dltransMain.init(&_display, 200, DLTransition::Interpolation::APOW3)) {
-		return false;
+	if (isInteractionAvailable()) {
+		// Init display at first place as this is must have in user interaction mode
+		if (!_display.init(&Wire, 0, 0x3C)) {
+			_displayErrorTimerLED.init(LED_BUILTIN);
+			_displayErrorTimerLED.setIntervals(4, (const uint16_t[]){ 50, 100, 150, 100 });
+			_displayErrorTimerLED.restart();
+			return false;
+		}
+		DLOGLN(F("Display initialized"));
+		_display->clearDisplay();
+		
+		// Order should follow the order in DisplayLayouts
+		for (uint8_t i = 0; i < DisplayLayoutKeys::_COUNT; ++i) _dLayouts.push_back(nullptr);
+		_dLayouts[DisplayLayoutKeys::WELCOME].reset(new DLayoutWelcome);
+		_dLayouts[DisplayLayoutKeys::BACKGROUND_INTERRUPTED].reset(new DLayoutBackgroundInterrupted);
+		// // Menu layouts
+		_dLayouts[DisplayLayoutKeys::MAIN].reset(new DLayoutMain);
+		_dLayouts[DisplayLayoutKeys::GRAPH].reset(new DLayoutGraph);
+		_dLayouts[DisplayLayoutKeys::SETTINGS].reset(new DLayoutSettings);
+
+		// _dLayouts.push_back(std::make_unique<DLayoutWelcome>());
+		// _dLayouts.push_back(std::make_unique<DLayoutBackgroundInterrupted>());
+		// // Menu layouts
+		// _dLayouts.push_back(std::make_unique<DLayoutMain>());
+		// _dLayouts.push_back(std::make_unique<DLayoutGraph>());
+		// _dLayouts.push_back(std::make_unique<DLayoutSettings>());
+		for (auto& dlayout : _dLayouts) {
+			if (!dlayout->init(&_display, this, &_btn1, &_btn2))
+				return false;
+		}
+		DLOGLN(F("Display layouts initialized"));
+
+		if (!_dltransMain.init(&_display, 200, DLTransition::Interpolation::APOW3))
+			return false;
+		DLOGLN(F("Display transition initialized"));
 	}
 
-	if (!_btn1.init(INTERACT_PUSHBUTTON_1_PIN)) {
-		DLOGLN(initFailed);
+	if (!_sensorTemp.init())
 		return false;
-	}
-	if (!_btn2.init(INTERACT_PUSHBUTTON_2_PIN)) {
-		DLOGLN(initFailed);
-		return false;
-	}
-	
-	_dLayouts[DisplayLayoutKeys::WELCOME]->draw();
-	delay(DISPLAY_LAYOUT_LOGO_DELAY);
-
+	DLOGLN(F("Sensor temp initialized"));
 	measureTemperature();
-	activateDisplayLayout(DisplayLayoutKeys::MAIN, DLTransitionStyle::NONE);
 	
-	// ESP.deepSleep(5e6); /* Sleep for 5 seconds */
+	if (isModeInteract()) {
+		activateDisplayLayout(DisplayLayoutKeys::WELCOME, DLTransitionStyle::NONE);
+	} else if (isModeBackgroundInterrupted()) {
+		activateDisplayLayout(DisplayLayoutKeys::BACKGROUND_INTERRUPTED, DLTransitionStyle::NONE);
+	}
 
 	return true;
 }
@@ -72,34 +117,37 @@ void Application::loop() {
 		_displayErrorTimerLED.tick();
 	}
 
-	_dltransMain.tick();
 	_btn1.tick();
 	_btn2.tick();
-	getActiveDisplayLayout()->tick();
+
+	if (isInteractionAvailable()) {
+		_dltransMain.tick();
+		getActiveDisplayLayout()->tick();
+	}
 }
 
 void Application::activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransitionStyle style) {
-	if (dLayoutKey == _dLayoutActiveKey) {
+	if (!isInteractionAvailable() || dLayoutKey == DisplayLayoutKeys::NONE || dLayoutKey == _dLayoutActiveKey) {
 		return;
 	}
 	DisplayLayout* target = _dLayouts[dLayoutKey].get();
 
-	Display::ScrollDir direction = Display::ScrollDir::LEFT;
-	switch (style) {
-		case DLTransitionStyle::AUTO: {
-			int8_t keyDst = dLayoutKey - _dLayoutActiveKey;
-			bool jump = abs(keyDst) > 1;
-			direction = ((keyDst < 0 && jump) || (keyDst > 0 && !jump)) ? Display::ScrollDir::LEFT : Display::ScrollDir::RIGHT;
-			break;
-		}
-		case DLTransitionStyle::RIGHT: {
-			direction = Display::ScrollDir::RIGHT;
-			break;
-		}
-	}
 	if (style == DLTransitionStyle::NONE) {
 		target->activate();
 	} else {
+		Display::ScrollDir direction = Display::ScrollDir::LEFT;
+		switch (style) {
+			case DLTransitionStyle::AUTO: {
+				int8_t keyDst = dLayoutKey - _dLayoutActiveKey;
+				bool jump = abs(keyDst) > 1;
+				direction = ((keyDst < 0 && jump) || (keyDst > 0 && !jump)) ? Display::ScrollDir::LEFT : Display::ScrollDir::RIGHT;
+				break;
+			}
+			case DLTransitionStyle::RIGHT: {
+				direction = Display::ScrollDir::RIGHT;
+				break;
+			}
+		}
 		_dltransMain.start(getActiveDisplayLayout(), target, direction);
 	}
 	_dLayoutActiveKey = dLayoutKey;
@@ -109,11 +157,6 @@ void Application::activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransiti
 
 Application app;
 void setup() {
-#ifdef TDEBUG
-	Serial.begin(115200);
-	delay(1);
-	Serial.println();
-#endif
 	const bool setupSucceeded = app.setup();
 	DLOGLN(setupSucceeded);
 }
