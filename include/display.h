@@ -59,6 +59,7 @@ private:
 
 class DisplayLayout;
 class DLTransition {
+	// TODO: Add minimal delay between redraws on tick() function
 public:
 	enum Interpolation {
 		LINEAR = 0,

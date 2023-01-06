@@ -2,15 +2,37 @@
 #include "logo.h"
 #include "main.h"
 
-bool DLGUI::init(Display* display) {
+bool DLGUI::init(Display* display, bool visible, bool focused) {
     if (!display)
         return false;
     _display = display;
+    setVisible(visible);
+    setFocused(focused);
     return true;
 }
 
-bool DLButton::init(Display* display, UPoint pos, UPoint size, const String& title) {
-    if (!DLGUI::init(display))
+void DLGUI::setVisible(bool visible, bool reDraw, bool doDisplay) {
+	_visible = visible;
+	if (reDraw) {
+		if (_visible) {
+			draw(doDisplay);
+		} else {
+			clear(doDisplay);
+		}
+	}
+}
+
+void DLGUI::setFocused(bool focused, bool reDraw, bool doDisplay) {
+	_focused = focused;
+	if (reDraw) {
+		draw(doDisplay);
+	}
+}
+
+///////////////////////////////
+
+bool DLButton::init(Display* display, UPoint pos, UPoint size, const String& title, bool visible, bool focused) {
+    if (!DLGUI::init(display, visible, focused))
         return false;
     _pos = pos;
     _size = size;
@@ -28,22 +50,38 @@ bool DLButton::init(Display* display, UPoint pos, UPoint size, const String& tit
 
     return true;
 }
-void DLButton::tick() {
 
-}
 void DLButton::draw(bool doDisplay, bool clearFirst) {
 	DLGUI::draw(doDisplay, clearFirst);
+    if (!isVisible()) {
+        return;
+    }
+
 	// DLOGLN();
-    if (clearFirst)
-	    display()->fillRect(_pos.x, _pos.y, _size.x, _size.y, DISPLAY_BLACK);
+	uint8_t clrBG = _focused ? DISPLAY_WHITE : DISPLAY_BLACK;
+	uint8_t clrFG = _focused ? DISPLAY_BLACK : DISPLAY_WHITE;
+
+	if (clearFirst && !_focused) {
+		clear(false);
+	}
+    if (_focused) {
+	    display()->fillRect(_pos.x, _pos.y, _size.x, _size.y, clrBG);
+	} else {
+    	display()->drawRect(_pos.x, _pos.y, _size.x, _size.y, clrFG);
+	}
     
-    display()->drawRect(_pos.x, _pos.y, _size.x, _size.y, DISPLAY_WHITE);
-    
-	display()->setTextColor(DISPLAY_WHITE);
+	display()->setTextColor(clrFG);
     display()->setCursor(_pos.x + _titleOffset.x, _pos.y + _titleOffset.y);
 	display()->setTextSize(_textSize);
 	display()->print(_title);
     
+	if (doDisplay) {
+		display()->display();
+	}
+}
+
+void DLButton::clear(bool doDisplay) {
+	display()->fillRect(_pos.x, _pos.y, _size.x, _size.y, DISPLAY_BLACK);
 	if (doDisplay) {
 		display()->display();
 	}
@@ -78,9 +116,9 @@ void DLayoutWelcome::deactivate() {
 }
 void DLayoutWelcome::tick() {
 	DisplayLayout::tick();
-	_btn1->reset();
-	_btn2->reset();
 	if (_timer.tick()) {
+		_btn1->reset();
+		_btn2->reset();
 		_app->activateDisplayLayout(DisplayLayoutKeys::MAIN, DLTransitionStyle::NONE);
 	}
 }
@@ -110,7 +148,7 @@ void DLayoutBackgroundInterrupted::draw(bool doDisplay) {
 	display()->setTextSize(1);
 	display()->print(F("Interrupted!"));
 
-    _gBtn.draw(doDisplay, true);
+    _gBtn.draw();
     
 	if (doDisplay) {
 		display()->display();
@@ -118,10 +156,59 @@ void DLayoutBackgroundInterrupted::draw(bool doDisplay) {
 }
 void DLayoutBackgroundInterrupted::tick() {
 	DisplayLayout::tick();
-	_btn1->reset();
-	_btn2->reset();
+	bool tickBtn1 = _btn1->tick();
+	bool tickBtn2 = _btn2->tick();
 }
 
+//////////////////////////
+
+void DLayoutMain::drawGButtons(bool doDisplay) {
+    _gBtnStart.draw(doDisplay);
+    _gBtnResume.draw(doDisplay);
+    _gBtnStop.draw(doDisplay);
+}
+void DLayoutMain::adjustGButtonsModeInteract() {
+	_gBtnResume.setFocused(false);
+	_gBtnStop.setFocused(false);
+	_gBtnStart.setFocused(false);
+
+	_gBtnResume.setVisible(false);
+	_gBtnStop.setVisible(false);
+	_gBtnStart.setVisible(true);
+}
+void DLayoutMain::adjustGButtonsModeBGInterrupted() {
+	_gBtnResume.setFocused(false);
+	_gBtnStop.setFocused(false);
+	_gBtnStart.setFocused(false);
+
+	_gBtnStart.setVisible(false);
+	_gBtnResume.setVisible(true);
+	_gBtnStop.setVisible(true);
+}
+
+bool DLayoutMain::init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) {
+	const bool success = DisplayLayout::init(display, app, btn1, btn2);
+    const uint8_t bWidth = 42;
+    const uint8_t bHeight = 16;
+	const uint8_t bPadding = 10;
+    const UPoint bSize{ bWidth, bHeight };
+	const uint8_t dWidth = _display->rawWidth();
+    const uint16_t bY = _display->rawHeight() - bHeight;
+	return success
+        && _gBtnStart.init(display, {(dWidth - bWidth) / 2, bY}, bSize, "Start")
+        && _gBtnResume.init(display, {(dWidth - 2 * bWidth - bPadding) / 2, bY}, bSize, "Resume", 0)
+        && _gBtnStop.init(display, {(dWidth - 2 * bWidth - bPadding) / 2 + bWidth + bPadding, bY}, bSize, "Stop", 0);
+}
+void DLayoutMain::activate() {
+    if (_app->isModeBackgroundInterrupted()) {
+		DLOGLN(F("DLMain activated in BI mode"));
+		adjustGButtonsModeBGInterrupted();
+    } else {
+		DLOGLN(F("DLMain activated in I mode"));
+		adjustGButtonsModeInteract();
+    }
+    DisplayLayout::activate();
+}
 void DLayoutMain::update(void* data) {
 	DisplayLayout::draw(data);
 	TempSensorData* tempData = static_cast<TempSensorData*>(data);
@@ -129,13 +216,52 @@ void DLayoutMain::update(void* data) {
 }
 void DLayoutMain::tick() {
 	DisplayLayout::tick();
-	if (_btn1->click()) {
-		_app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
-		return;
+	bool tickBtn1 = _btn1->tick();
+	bool tickBtn2 = _btn2->tick();
+	
+	if (tickBtn1) {
+		if (!tickBtn2) {
+			LOGLN(F("tick: 1 & !2"));
+			if (_app->isModeBackgroundInterrupted()) { // in BI mode
+				if (!_gBtnResume.isFocused() && !_gBtnStop.isFocused()) {
+					if (_btn1->click()) { // just scroll menu
+						_app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
+					}
+				} else {
+
+				}
+			} else {
+				if (_gBtnStart.isFocused()) { // already in focus
+					LOGLN(F("Start-inFocus"));
+					if (_btn1->release()) {
+						LOGLN(F("1-release -> start unfocused, mode changed to BI"));
+						_gBtnStart.setFocused(false);
+						_app->setModeBackgroundInterrupted();
+						activate(); // TODO: turn off directly
+					}
+				} else { // just started pressing button
+					LOGLN(F("Start-!focused"));
+					if (_btn1->hold()) { // enter focusing 'start' button
+						LOGLN(F("1-hold -> start focused"));
+						_gBtnStart.setFocused(true, true, true);
+					}
+					if (_btn1->click()) { // just scroll menu
+						_app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
+					}
+				}
+			}
+		} else {
+			if (_btn1->hold() && _btn2->press()) {
+				_btn1->reset();
+				_btn2->reset();
+			}
+		}
 	}
-	if (_btn2->click()) {
-		_app->activateDisplayLayout(DisplayLayoutKeys::GRAPH);
-		return;
+	if (tickBtn2 && !tickBtn1) {
+		LOGLN(F("tick: 2 & !1"));
+		if (_btn2->click()) {
+			_app->activateDisplayLayout(DisplayLayoutKeys::GRAPH);
+		}
 	}
 }
 void DLayoutMain::draw(bool doDisplay) {
@@ -146,7 +272,7 @@ void DLayoutMain::draw(bool doDisplay) {
 	display()->setTextColor(DISPLAY_WHITE);
 
 	char buffer[16];
-	dtostrf(_temp1, 6, 2, buffer);
+	dtostrf(_temp1, 6, 1, buffer);
 	
 	display()->setCursor(0, DISPLAY_LAYOUT_PADDING_TOP);
 	display()->setTextSize(3);
@@ -159,6 +285,8 @@ void DLayoutMain::draw(bool doDisplay) {
 	display()->setCursor(0, 0);
 	display()->setTextSize(1);
 	display()->print(F("Thermograph v2"));
+	
+	drawGButtons();
 
 	if (doDisplay) {
 		display()->display();
@@ -171,11 +299,13 @@ void DLayoutGraph::update(void* data) {
 }
 void DLayoutGraph::tick() {
 	DisplayLayout::tick();
-	if (_btn1->click()) {
+	bool tickBtn1 = _btn1->tick();
+	bool tickBtn2 = _btn2->tick();
+	if (tickBtn1 && _btn1->click()) {
 		_app->activateDisplayLayout(DisplayLayoutKeys::MAIN);
 		return;
 	}
-	if (_btn2->click()) {
+	if (tickBtn2 && _btn2->click()) {
 		_app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
 		return;
 	}
@@ -219,11 +349,13 @@ void DLayoutSettings::tick() {
 		display()->display();
 	}
 
-	if (_btn1->click()) {
+	bool tickBtn1 = _btn1->tick();
+	bool tickBtn2 = _btn2->tick();
+	if (tickBtn1 && _btn1->click()) {
 		_app->activateDisplayLayout(DisplayLayoutKeys::GRAPH);
 		return;
 	}
-	if (_btn2->click()) {
+	if (tickBtn2 && _btn2->click()) {
 		_app->activateDisplayLayout(DisplayLayoutKeys::MAIN);
 		return;
 	}

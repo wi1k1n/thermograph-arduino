@@ -46,7 +46,7 @@ bool Application::setup() {
 		delay(MODE_DETECTION_DELAY);
 		if (_btn1.tick() && !_btn2.tick()) {
 			DLOGLN(F("[DEBUG] FORCED TO ENTER BACKGROUND_INTERRUPTED MODE!"));
-			_mode = Mode::BACKGROUND_INTERRUPTED;
+			setModeBackgroundInterrupted();
 		}
 #endif
 	} else {
@@ -55,7 +55,7 @@ bool Application::setup() {
 		delay(MODE_DETECTION_DELAY);
 		if (_btn1.tick() && _btn2.tick()) {
 			DLOG(F("Button1 and Button2: pressed"));
-			_mode = Mode::BACKGROUND_INTERRUPTED;
+			setModeBackgroundInterrupted();
 		}
 	}
 	DLOG(F("Mode: "));
@@ -104,8 +104,8 @@ bool Application::setup() {
 
 void Application::loop() {
 	_display.tick();
-	_btn1.tick();
-	_btn2.tick();
+	// _btn1.tick();
+	// _btn2.tick();
 
 	if (isInteractionAvailable()) {
 		_dltransMain.tick();
@@ -143,13 +143,13 @@ void Application::activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransiti
 /////////////////////////
 
 Application app;
-void setup() {
-	const bool setupSucceeded = app.setup();
-	DLOGLN(setupSucceeded);
-}
-void loop() {
-	app.loop();
-}
+// void setup() {
+// 	const bool setupSucceeded = app.setup();
+// 	DLOGLN(setupSucceeded);
+// }
+// void loop() {
+// 	app.loop();
+// }
 
 
 // //The setup function is called once at startup of the sketch
@@ -170,3 +170,10 @@ void loop() {
  
 // void loop() {
 // }
+
+void setup() {
+
+}
+void loop() {
+	
+}

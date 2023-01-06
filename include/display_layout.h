@@ -10,13 +10,22 @@
 class DLGUI {
 protected:
     Display* _display = nullptr;
+    bool _visible = false;
+    bool _focused = false;
     
 	inline Display& display() { return *_display; }
 public:
     DLGUI() = default;
-    virtual bool init(Display* display);
+    virtual bool init(Display* display, bool visible = true, bool focused = false);
     virtual void tick() { }
     virtual void draw(bool doDisplay = true, bool clearFirst = true) { }
+	virtual void clear(bool doDisplay = false) { }
+    
+    inline bool isVisible() const { return _visible; }
+    inline bool isFocused() const { return _focused; }
+
+    inline void setVisible(bool visible = true, bool reDraw = false, bool doDisplay = false);
+    inline void setFocused(bool focused = true, bool reDraw = false, bool doDisplay = false);
 };
 
 class DLButton : public DLGUI {
@@ -28,9 +37,10 @@ class DLButton : public DLGUI {
     uint8_t _borderThickness = 1;
     UPoint _titleOffset;
 public:
-    bool init(Display* display, UPoint pos, UPoint size, const String& title);
-    void tick() override;
-    void draw(bool doDisplay = true, bool clearFirst = true) override;
+    bool init(Display* display, UPoint pos, UPoint size, const String& title, bool visible = true, bool focused = false);
+    void tick() override { }
+    void draw(bool doDisplay = false, bool clearFirst = true) override;
+	void clear(bool doDisplay = false) override;
 };
 
 ////////////////////////////////////
@@ -74,7 +84,17 @@ public:
 // Menu layouts
 class DLayoutMain : public DisplayLayout {
 	float _temp1;
+    
+    DLButton _gBtnStart;
+    DLButton _gBtnResume;
+    DLButton _gBtnStop;
+	
+	void drawGButtons(bool doDisplay = false);
+	void adjustGButtonsModeInteract();
+	void adjustGButtonsModeBGInterrupted();
 public:
+	bool init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) override;
+	void activate() override;
 	void draw(bool doDisplay = true) override;
 	void update(void* data) override;
 	void tick() override;
