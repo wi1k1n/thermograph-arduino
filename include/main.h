@@ -43,6 +43,7 @@ public:
 	inline bool isModeBackgroundInterrupted() const { return _mode == Mode::BACKGROUND_INTERRUPTED; }
 	inline bool isModeInteract() const { return _mode == Mode::INTERACT; }
 	inline void setModeBackgroundInterrupted() { _mode = Mode::BACKGROUND_INTERRUPTED; }
+	inline void setModeInteract() { _mode = Mode::INTERACT; }
 
 	inline bool isInteractionAvailable() const { return isModeBackgroundInterrupted() || isModeInteract() ;}
 };

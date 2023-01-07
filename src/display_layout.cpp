@@ -117,8 +117,8 @@ void DLayoutWelcome::deactivate() {
 void DLayoutWelcome::tick() {
 	DisplayLayout::tick();
 	if (_timer.tick()) {
-		_btn1->reset();
-		_btn2->reset();
+		// _btn1->reset();
+		// _btn2->reset();
 		_app->activateDisplayLayout(DisplayLayoutKeys::MAIN, DLTransitionStyle::NONE);
 	}
 }
@@ -156,8 +156,8 @@ void DLayoutBackgroundInterrupted::draw(bool doDisplay) {
 }
 void DLayoutBackgroundInterrupted::tick() {
 	DisplayLayout::tick();
-	bool tickBtn1 = _btn1->tick();
-	bool tickBtn2 = _btn2->tick();
+	// bool tickBtn1 = _btn1->tick();
+	// bool tickBtn2 = _btn2->tick();
 }
 
 //////////////////////////
@@ -188,6 +188,7 @@ void DLayoutMain::adjustGButtonsModeBGInterrupted() {
 
 bool DLayoutMain::init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) {
 	const bool success = DisplayLayout::init(display, app, btn1, btn2);
+	_debugLED.init(LED_BUILTIN);
     const uint8_t bWidth = 42;
     const uint8_t bHeight = 16;
 	const uint8_t bPadding = 10;
@@ -218,24 +219,33 @@ void DLayoutMain::tick() {
 	DisplayLayout::tick();
 	bool tickBtn1 = _btn1->tick();
 	bool tickBtn2 = _btn2->tick();
-	
-	if (tickBtn1) {
-		if (!tickBtn2) {
+	// Don't waste time if nothing to process
+	if (!tickBtn1 && !tickBtn2) {
+		_debugLED.on();
+		return;
+	}
+	_debugLED.off();
+
+	if (_btn1->state()) {
+		if (!_btn2->state()) {
 			LOGLN(F("tick: 1 & !2"));
 			if (_app->isModeBackgroundInterrupted()) { // in BI mode
+				LOG(F("Focus: "));
+				LOG(_gBtnStart.isFocused());
+				LOG(_gBtnStop.isFocused());
+				LOGLN(_gBtnResume.isFocused());
 				if (!_gBtnResume.isFocused() && !_gBtnStop.isFocused()) {
 					if (_btn1->click()) { // just scroll menu
 						_app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
 					}
 				} else {
-
 				}
 			} else {
 				if (_gBtnStart.isFocused()) { // already in focus
 					LOGLN(F("Start-inFocus"));
 					if (_btn1->release()) {
 						LOGLN(F("1-release -> start unfocused, mode changed to BI"));
-						_gBtnStart.setFocused(false);
+						// _gBtnStart.setFocused(false);
 						_app->setModeBackgroundInterrupted();
 						activate(); // TODO: turn off directly
 					}
@@ -246,20 +256,29 @@ void DLayoutMain::tick() {
 						_gBtnStart.setFocused(true, true, true);
 					}
 					if (_btn1->click()) { // just scroll menu
+						LOGLN(F("Menu change -> Settings"));
 						_app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
 					}
 				}
 			}
 		} else {
 			if (_btn1->hold() && _btn2->press()) {
+				LOGLN(F("1-hold & 2-press"));
 				_btn1->reset();
 				_btn2->reset();
 			}
 		}
 	}
-	if (tickBtn2 && !tickBtn1) {
+	if (_btn2->state() && !_btn1->state()) {
 		LOGLN(F("tick: 2 & !1"));
-		if (_btn2->click()) {
+		if (_app->isModeBackgroundInterrupted()) {
+			LOGLN(F("DEBUG: back to interact"));
+			if (_btn2->click()) {
+				_app->setModeInteract();
+				activate(); // TODO: turn off directly
+			}
+		} else if (_btn2->click()) {
+			LOGLN(F("Menu change -> Graph"));
 			_app->activateDisplayLayout(DisplayLayoutKeys::GRAPH);
 		}
 	}
@@ -301,11 +320,11 @@ void DLayoutGraph::tick() {
 	DisplayLayout::tick();
 	bool tickBtn1 = _btn1->tick();
 	bool tickBtn2 = _btn2->tick();
-	if (tickBtn1 && _btn1->click()) {
+	if (tickBtn1 && _btn1->state() && _btn1->click()) {
 		_app->activateDisplayLayout(DisplayLayoutKeys::MAIN);
 		return;
 	}
-	if (tickBtn2 && _btn2->click()) {
+	if (tickBtn2 && _btn2->state() && _btn2->click()) {
 		_app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
 		return;
 	}
@@ -349,13 +368,13 @@ void DLayoutSettings::tick() {
 		display()->display();
 	}
 
-	bool tickBtn1 = _btn1->tick();
-	bool tickBtn2 = _btn2->tick();
-	if (tickBtn1 && _btn1->click()) {
+	_btn1->tick();
+	_btn2->tick();
+	if (_btn1->state() && _btn1->click()) {
 		_app->activateDisplayLayout(DisplayLayoutKeys::GRAPH);
 		return;
 	}
-	if (tickBtn2 && _btn2->click()) {
+	if (_btn2->state() && _btn2->click()) {
 		_app->activateDisplayLayout(DisplayLayoutKeys::MAIN);
 		return;
 	}

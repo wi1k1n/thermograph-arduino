@@ -3,6 +3,18 @@
 
 #include "TimerMs.h"
 
+class LED {
+	uint8_t _pin = 0;
+	bool _val = false;
+public:
+	LED() = default;
+	bool init(uint8_t pin, bool val = false) { _pin = pin; pinMode(pin, OUTPUT); write(val); return true; }
+	void on() { write(true); }
+	void off() { write(false); }
+	void toggle() { write(!_val); }
+	void write(bool val) { _val = val; digitalWrite(_pin, val ? LOW : HIGH); }
+};
+
 class Timer : public TimerMs {
 public:
 	enum MODE {

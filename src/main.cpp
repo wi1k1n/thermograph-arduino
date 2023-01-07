@@ -138,18 +138,22 @@ void Application::activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransiti
 		_dltransMain.start(getActiveDisplayLayout(), target, direction);
 	}
 	_dLayoutActiveKey = dLayoutKey;
+	// // Reset is required as display layouts are responsible for btn.tick(), but they might ignore doing this
+	// // which leads to frozen buttons
+	// _btn1.reset();
+	// _btn2.reset();
 }
 
 /////////////////////////
 
 Application app;
-// void setup() {
-// 	const bool setupSucceeded = app.setup();
-// 	DLOGLN(setupSucceeded);
-// }
-// void loop() {
-// 	app.loop();
-// }
+void setup() {
+	const bool setupSucceeded = app.setup();
+	DLOGLN(setupSucceeded);
+}
+void loop() {
+	app.loop();
+}
 
 
 // //The setup function is called once at startup of the sketch
@@ -171,9 +175,22 @@ Application app;
 // void loop() {
 // }
 
-void setup() {
+// PushButton btn;
 
-}
-void loop() {
-	
-}
+// void setup() {
+// 	Serial.begin(115200);
+// 	btn.init(INTERACT_PUSHBUTTON_1_PIN);
+// }
+// void printFlag(uint16_t f) {
+// 	for (uint8_t i = 0; i < 16; ++i) {
+// 		Serial.print((bool)(f & (1 << i)));
+// 	}
+// 	// Serial.print(f);
+// }
+// void loop() {
+// 	btn.tick();
+// 	printFlag(btn.state());
+// 	Serial.print(" ");
+// 	Serial.println(btn.hold());
+// 	delay(50);
+// }

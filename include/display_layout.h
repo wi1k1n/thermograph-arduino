@@ -88,6 +88,8 @@ class DLayoutMain : public DisplayLayout {
     DLButton _gBtnStart;
     DLButton _gBtnResume;
     DLButton _gBtnStop;
+
+	LED _debugLED;
 	
 	void drawGButtons(bool doDisplay = false);
 	void adjustGButtonsModeInteract();
