@@ -2,6 +2,7 @@
 #define UTILITIES_H__
 
 #include "TimerMs.h"
+#include "VirtualButton.h"
 
 class LED {
 	uint8_t _pin = 0;
@@ -13,6 +14,24 @@ public:
 	void off() { write(false); }
 	void toggle() { write(!_val); }
 	void write(bool val) { _val = val; digitalWrite(_pin, val ? LOW : HIGH); }
+};
+
+#define PUSHBUTTON_PIN_UNASSIGNED 0xff
+class PushButton : public VButton {
+	uint8_t _pin = PUSHBUTTON_PIN_UNASSIGNED;
+public:
+	PushButton() = default;
+	PushButton(uint8_t pin) {
+		init(pin);
+	}
+	bool init(uint8_t pin) {
+		_pin = pin;
+		pinMode(_pin, INPUT_PULLUP);
+		return true;
+	}
+	bool tick() {
+		return poll(!digitalRead(_pin));
+	}
 };
 
 class Timer : public TimerMs {

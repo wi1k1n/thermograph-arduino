@@ -103,10 +103,7 @@ bool Application::setup() {
 }
 
 void Application::loop() {
-	_display.tick();
-	// _btn1.tick();
-	// _btn2.tick();
-
+	_display.tick(); // out of the interact mode scope because of display error led timer
 	if (isInteractionAvailable()) {
 		_dltransMain.tick();
 		getActiveDisplayLayout()->tick();
@@ -138,10 +135,9 @@ void Application::activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransiti
 		_dltransMain.start(getActiveDisplayLayout(), target, direction);
 	}
 	_dLayoutActiveKey = dLayoutKey;
-	// // Reset is required as display layouts are responsible for btn.tick(), but they might ignore doing this
-	// // which leads to frozen buttons
-	// _btn1.reset();
-	// _btn2.reset();
+	// Some flags can persist from previous layouts control handling, reset them
+	_btn1.reset();
+	_btn2.reset();
 }
 
 /////////////////////////
@@ -173,24 +169,4 @@ void loop() {
 // }
  
 // void loop() {
-// }
-
-// PushButton btn;
-
-// void setup() {
-// 	Serial.begin(115200);
-// 	btn.init(INTERACT_PUSHBUTTON_1_PIN);
-// }
-// void printFlag(uint16_t f) {
-// 	for (uint8_t i = 0; i < 16; ++i) {
-// 		Serial.print((bool)(f & (1 << i)));
-// 	}
-// 	// Serial.print(f);
-// }
-// void loop() {
-// 	btn.tick();
-// 	printFlag(btn.state());
-// 	Serial.print(" ");
-// 	Serial.println(btn.hold());
-// 	delay(50);
 // }

@@ -83,6 +83,7 @@ public:
     }
 
     // ======================================= BTN =======================================
+	bool down() { return readF(_VBFLAG_BUTTON); }                       // нажата ли кнопка (false до дебаунса, true - все время после, если нажата)
     bool busy() { return readF(_VBFLAG_BUSY); }                         // вернёт true, если всё ещё нужно вызывать tick для опроса таймаутов
     bool press() { return checkF(_VBFLAG_PRESS); }                      // кнопка нажата
     bool release() { return checkF(_VBFLAG_RELEASED); }                 // кнопка отпущена
@@ -105,7 +106,6 @@ public:
     
     // с момента отпускания кнопки прошло указанное время, миллисекунд
     bool timeout(uint16_t tout) { return ((uint16_t)(millis() & 0xFFFF) - _debTmr > tout && checkF(_VBFLAG_TIMEOUT)); }
-	bool state() { return readF(_VBFLAG_BUTTON) || readF(_VBFLAG_RELEASED); }
     
     uint8_t clicks = 0;                                                 // счётчик кликов
     
