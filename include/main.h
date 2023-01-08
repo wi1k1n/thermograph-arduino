@@ -15,7 +15,10 @@ class Application {
 	enum Mode {
 		BACKGROUND = 0,				// autonomously woke up while working in background
 		BACKGROUND_INTERRUPTED,		// background job in progress but user interrupt
-		INTERACT					// no background job in process, fully interact
+		INTERACT,					// no background job in process, fully interact
+#ifdef TDEBUG
+		_DEBUG_LITTLEFS_EXPLORER,
+#endif
 	};
 
 	Mode _mode = Mode::BACKGROUND;

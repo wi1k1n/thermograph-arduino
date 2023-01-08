@@ -1,4 +1,5 @@
 #include "filesystem.h"
+#include "sdk.h"
 
 Config Storage::_config;
 
@@ -7,12 +8,26 @@ bool Storage::init() {
 		return false;
 	}
 	// TODO: make open/close easier to work with
-	File f = LittleFS.open("/config", "r");
+	AutoFile f = openR("/config");
 	if (!f) {
-		// _config
+		DLOGLN("No File!");
+	} else {
+		// AutoFile
 	}
-	f.close();
 	return true;
+}
+
+AutoFile Storage::open(const char* path, const char* mode) {
+	return AutoFile(LittleFS.open(path, mode));
+}
+AutoFile Storage::open(const String& path, const char* mode) {
+	return AutoFile(LittleFS.open(path, mode));
+}
+AutoFile Storage::openR(const char* path) {
+	return open(path, "r");
+}
+AutoFile Storage::openW(const char* path) {
+	return open(path, "w");
 }
 
 bool Storage::isSleeping() {

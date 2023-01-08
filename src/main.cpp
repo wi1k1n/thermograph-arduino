@@ -1,5 +1,8 @@
 #include "main.h"
 #include "filesystem.h"
+#ifdef TDEBUG
+#include "_debug.h"
+#endif
 
 void Application::measureTemperature() {
 	// TODO: refactor in a proper way
@@ -38,11 +41,20 @@ bool Application::setup() {
 	if (!_btn2.init(INTERACT_PUSHBUTTON_2_PIN))
 		return false;
 	DLOGLN(F("Buttons initialized"));
+
+#ifdef TDEBUG // Hold btn2 to load Serial LittleFS explorer code
+	delay(MODE_DETECTION_DELAY);
+	if (!_btn1.tick() && _btn2.tick()) {
+		DLOGLN(F("[DEBUG] LittleFS explorer mode! Run 'help' to check available commands."));
+		_mode = Mode::_DEBUG_LITTLEFS_EXPLORER;
+		return true;
+	}
+#endif
 	
 	// If not sleeping -> INTERACT mode
 	if (!Storage::isSleeping()) {
 		_mode = Mode::INTERACT;
-#ifdef TDEBUG
+#ifdef TDEBUG // Hold btn1 to force app to load in BI mode
 		delay(MODE_DETECTION_DELAY);
 		if (_btn1.tick() && !_btn2.tick()) {
 			DLOGLN(F("[DEBUG] FORCED TO ENTER BACKGROUND_INTERRUPTED MODE!"));
@@ -103,6 +115,10 @@ bool Application::setup() {
 }
 
 void Application::loop() {
+#ifdef TDEBUG
+	if (_mode == Mode::_DEBUG_LITTLEFS_EXPLORER)
+		return DEBUG::LittleFSExplorer();
+#endif
 	_display.tick(); // out of the interact mode scope because of display error led timer
 	if (isInteractionAvailable()) {
 		_dltransMain.tick();
@@ -150,7 +166,6 @@ void setup() {
 void loop() {
 	app.loop();
 }
-
 
 // //The setup function is called once at startup of the sketch
 // void setup() {
