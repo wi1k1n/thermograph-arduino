@@ -167,7 +167,8 @@ void loop() {
 	app.loop();
 }
 
-// //The setup function is called once at startup of the sketch
+
+// // Sanity Test deep sleep
 // void setup() {
 //   Serial.begin(115200);
 //   while(!Serial) { }
@@ -184,4 +185,38 @@ void loop() {
 // }
  
 // void loop() {
+// }
+
+// // Sanity test display
+// Display _display;
+// void setup() {
+// 	Serial.begin(115200);
+// 	delay(1);
+// 	Serial.println();
+// 	_display.init(&Wire, 0, 0x3C);
+// 	delay(100);
+
+// 	_display->clearDisplay();
+
+// 	_display->setTextColor(DISPLAY_WHITE);
+// 	_display->setCursor(0, 0);
+// 	_display->setTextSize(1);
+// 	_display->print(F("Thermograph v2"));
+
+// 	_display->display();
+// }
+// void loop() {
+// 	Serial.print(millis());
+// 	Serial.println(" hey!");
+// 	delay(500);
+// }
+
+// // LittleFS serial file explorer
+// void setup() {
+// 	Serial.begin(115200);
+// 	delay(1);
+// 	Serial.println();
+// }
+// void loop() {
+// 	DEBUG::LittleFSExplorer();
 // }

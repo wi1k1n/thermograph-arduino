@@ -107,6 +107,7 @@ void DEBUG::cmdMv(LFSECommand& cmd) {
 	}
 }
 void DEBUG::cmdTouch(LFSECommand& cmd) {
+	// TODO: change to non-destructive behavior!
 	cmd.parseArgs();
 	if (checkMissingOperand(cmd))
 		return;
@@ -175,6 +176,19 @@ void DEBUG::cmdRm(LFSECommand& cmd) {
 		return;
 	
 	bool removeDir = cmd.isSingleLetterFlagPresent('r');
+	// if these flags are present, command removes lines in file
+	int16_t lastIdx = cmd.getNumericalFlagValue('l', -1);
+	int16_t firstIdx = cmd.getNumericalFlagValue('f', -1);
+	if (lastIdx > -1) {
+		if (removeDir) {
+			LOGLN(F("Flags l and r are incompatible"));
+			return;
+		}
+		if (firstIdx > -1 && firstIdx > lastIdx) {
+			LOGLN(F("-l should be >= than -f"));
+			return;
+		}
+	}
 
 	String userPath(cmd.getArgFirstFilenameOrLastArg());
 	if (removeDir ? checkInvalidDirPath(userPath) : checkInvalidFilePath(userPath))
@@ -184,9 +198,11 @@ void DEBUG::cmdRm(LFSECommand& cmd) {
 	if (checkDoesntExist(path))
 		return;
 
-	File f = LittleFS.open(path, "w");
-	bool isDir = f.isDirectory();
-	f.close();
+	File file = LittleFS.open(path, "r+");
+	bool isDir = file.isDirectory();
+	file.close();
+
+	// Removing dir
 	if (isDir) {
 		if (!removeDir) {
 			LOG(path);
@@ -204,6 +220,54 @@ void DEBUG::cmdRm(LFSECommand& cmd) {
 		LOGLN(F(" is not a directory"));
 		return;
 	}
+
+	// Removing lines from file
+	if (lastIdx > -1) {
+		// LOGLN("Not implemented yet!");
+		uint16_t lineFirstIdx = firstIdx > -1 ? firstIdx : lastIdx;
+		uint16_t lineLastIdx = lastIdx;
+
+		DLOG(lineFirstIdx);
+		LOG(" ");
+		LOGLN(lineLastIdx);
+
+		File f = LittleFS.open(path, "r+");		
+		// first determine cursor pos where the second part should be copied to
+		uint16_t lineIdx = 0;
+		while (f.available() && lineIdx < lineFirstIdx) {
+			DLOGLN(lineIdx);
+			// char c = '\0';
+			// while (c != '\n') {
+			// 	c = (char)f.read();
+			// 	DLOGLN(c);
+			// }
+			f.readStringUntil('\n');
+			++lineIdx;
+		}
+		size_t insertCursor = f.position();
+		DLOGLN(insertCursor);
+		while (f.available()) {
+			String line = f.readStringUntil('\n');
+			if (lineIdx < lineLastIdx) {
+				++lineIdx;
+				continue;
+			}
+			DLOGLN(line);
+			size_t curPos = f.position();
+			DLOGLN(curPos);
+			f.seek(insertCursor);
+			insertCursor += f.println(line);
+			DLOGLN(insertCursor);
+			f.seek(curPos);
+		}
+		f.truncate(insertCursor);
+		f.seek(0);
+		DLOGLN(f.peekAvailable());
+		f.close();
+		return;
+	}
+
+	// Removing file
 	if (!LittleFS.remove(path)) {
 		LOG(F("Failed to remove file "));
 		LOGLN(path);
@@ -235,13 +299,9 @@ void DEBUG::cmdCat(LFSECommand& cmd) {
 	// get flags
 	bool lineNumbers = cmd.isSingleLetterFlagPresent('n');
 	bool byteView = cmd.isSingleLetterFlagPresent('b');
-
-	String limitColsStr(cmd.getNumericalFlagValue('c'));
-	uint16_t limitColumn = limitColsStr.isEmpty() ? 128 : max((long)0, limitColsStr.toInt());
-	String rowIdxFirstStr(cmd.getNumericalFlagValue('f'));
-	uint16_t rowIdxFirst = rowIdxFirstStr.isEmpty() ? 0 : max((long)0, rowIdxFirstStr.toInt());
-	String rowIdxLastStr(cmd.getNumericalFlagValue('l'));
-	uint16_t rowIdxLast = rowIdxLastStr.isEmpty() ? 64 : max((long)0, rowIdxLastStr.toInt());;
+	uint16_t limitColumn = cmd.getNumericalFlagValue('c', 128);
+	uint16_t rowIdxFirst = cmd.getNumericalFlagValue('f', 0);
+	uint16_t rowIdxLast = cmd.getNumericalFlagValue('l', 64);
 
 	uint16_t lineIdx = 0;
 	while (f.available() && lineIdx <= rowIdxLast) {
@@ -481,13 +541,18 @@ bool LFSECommand::isSingleLetterFlagPresent(char f) const {
 	}
 	return false;
 }
-String LFSECommand::getNumericalFlagValue(char f) const {
+
+template <typename T> static T CastStringToNum(const String& s) { return static_cast<T>(s); }
+template <> int CastStringToNum<int>(const String& s) { return s.toInt(); }
+template <> float CastStringToNum<float>(const String& s) { return s.toFloat(); }
+template <typename T>
+T LFSECommand::getNumericalFlagValue(char f, const T& fallback) const {
 	for (const Arg& arg : _args) {
-		if (arg.isFlagAndStartsWith(f)) {
-			return arg.value.substring(1);
+		if (arg.isFlagAndStartsWith(f) && arg.value.length() > 1 && (isDigit(arg.value[1]) || arg.value[1] == '-')) {
+			return CastStringToNum<T>(arg.value.substring(1));
 		}
 	}
-	return String();
+	return fallback;
 }
 
 uint8_t LFSECommand::getArgFirstFilenameOrLastArgIdx(uint8_t startIdx) const {
@@ -538,7 +603,7 @@ void LFSECommand::parseArgs() {
 			continue;
 		}
 		if (token.isTypeFlag()) { // already filling flag arg
-			if (isAlphaNumeric(c)) { // flag args are only alphanumeric
+			if (isAlphaNumeric(c) || c == '-' || c == '.') { // flag args are alphanumeric or '-' or '.'
 				token.value += c;
 				continue;
 			}

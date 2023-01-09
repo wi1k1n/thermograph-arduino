@@ -38,28 +38,6 @@ enum class DLTransitionStyle {
 };
 
 #ifdef TDEBUG
-// #define __PRIVATE_LOG_PREAMBULE(txt)   do {\
-// 											Serial.print(__FILE__);\
-// 											Serial.print(F(":"));\
-// 											Serial.print(__LINE__);\
-// 											Serial.print(F(":"));\
-// 											Serial.print(__func__);\
-// 											Serial.print(F("() - "));\
-// 										} while(false)
-// #define DLOGLN(txt)  do {\
-// 						__PRIVATE_LOG_PREAMBULE(txt);\
-// 						Serial.println(txt);\
-// 					} while(false)
-// #define DLOG(txt)    do {\
-// 						__PRIVATE_LOG_PREAMBULE(txt);\
-// 						Serial.print(txt);\
-// 					} while(false)
-// #define LOGLN(txt)	do {\
-// 						Serial.println(txt);\
-// 					} while(false)
-// #define LOG(txt)    do {\
-// 						Serial.print(txt);\
-// 					} while(false)
 #define __PRIVATE_LOG_PREAMBULE	   (Serial.print(millis())+\
 									Serial.print(" | ")+\
 									Serial.print(__FILE__)+\

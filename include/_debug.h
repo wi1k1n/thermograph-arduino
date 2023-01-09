@@ -100,7 +100,8 @@ struct LFSECommand {
 
 	// Flags
 	bool isSingleLetterFlagPresent(char f) const;
-	String getNumericalFlagValue(char f) const;
+	template <typename T>
+	T getNumericalFlagValue(char f, const T& fallback = T()) const;
 	// Filenames
 	uint8_t getArgFirstFilenameOrLastArgIdx(uint8_t startIdx = 0) const;
 	Arg getArgFirstFilenameOrLastArg(uint8_t startIdx = 0) const;
