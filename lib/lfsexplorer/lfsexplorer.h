@@ -1,11 +1,30 @@
-#ifndef _DEBUG_H__
-#define _DEBUG_H__
+#ifndef LFSEXPLORER_H__
+#define LFSEXPLORER_H__
 
-#include "sdk.h"
-#ifdef TDEBUG
-
+#ifndef __PRIVATE_LOG_PREAMBULE
+#define __PRIVATE_LOG_PREAMBULE	   (Serial.print(millis())+\
+									Serial.print(" | ")+\
+									Serial.print(__FILE__)+\
+									Serial.print(F(":"))+\
+									Serial.print(__LINE__)+\
+									Serial.print(F(":"))+\
+									Serial.print(__func__)+\
+									Serial.print(F("() - ")))
+#endif
+#ifndef DLOGLN
+#define DLOGLN(txt)		(__PRIVATE_LOG_PREAMBULE+Serial.println(txt))
+#endif
+#ifndef DLOGF
+#define DLOGF(fmt, ...)	(__PRIVATE_LOG_PREAMBULE+Serial.printf(fmt, __VA_ARGS__))
+#endif
+#ifndef DLOG
+#define DLOG(txt)    	(__PRIVATE_LOG_PREAMBULE+Serial.print(txt))
+#endif
 #ifndef LOG
 #define LOG(txt)    	(Serial.print(txt))
+#endif
+#ifndef LOGF
+#define LOGF(fmt, ...)	(Serial.printf(fmt, __VA_ARGS__))
 #endif
 #ifndef LOGLN
 #define LOGLN(txt)		(Serial.println(txt))
@@ -158,5 +177,4 @@ private:
 	static bool checkDoesntExist(const String& path);
 };
 
-#endif // #ifdef TDEBUG
-#endif // _DEBUG_H__
+#endif // LFSEXPLORER_H__

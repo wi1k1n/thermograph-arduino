@@ -1,7 +1,7 @@
 #include "main.h"
 #include "filesystem.h"
 #ifdef TDEBUG
-#include "_debug.h"
+#include "lfsexplorer.h"
 #endif
 
 void Application::measureTemperature() {

@@ -1,5 +1,4 @@
-#include "_debug.h"
-#include "filesystem.h"
+#include "lfsexplorer.h"
 
 std::map<String, cmdInfo> DEBUG::lfseCmdMap = {
 	cmdMapEntry("help", cmdInfo(cmdHelp, "", "show help message")),
