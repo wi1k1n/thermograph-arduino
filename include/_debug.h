@@ -70,17 +70,22 @@ struct LFSECommand {
 		} type = Type::NONE;
 		String value;
 		uint16_t idx = 0;
+		
+		inline bool isFlagAndStartsWith(char c) const { return isTypeFlag() && !value.isEmpty() && value[0] == c; }
 
-		std::vector<char> getSingleCharFlagsList() const;
-		std::unordered_set<char> getSingleCharFlagsSet() const;
+		inline bool isTypeFlag() const { return type == Type::FLAG; }
+		inline bool isTypeString() const { return type == Type::STRING; }
+		inline bool isTypeFilename() const { return type == Type::FILENAME; }
+
 		String toString(bool onlyContent = true) const {
 			if (onlyContent)
 				return value;
-			return (type == Type::FLAG ? "-" : (type == Type::STRING ? "\"" : "")) + value + (type == Type::STRING ? "\"" : "");
+			return (isTypeFlag() ? "-" : (type == Type::STRING ? "\"" : "")) + value + (type == Type::STRING ? "\"" : "");
 		}
 		operator String() const { return toString(); }
 
 		bool operator<(const Arg& rhs) const { return idx < rhs.idx; }
+		bool operator==(const Arg& x) const { return idx == x.idx && value.equals(x.value) && type == x.type; }
 	};
 
 	String _cmd;
@@ -93,9 +98,12 @@ struct LFSECommand {
 	LFSECommand() = default;
 	LFSECommand(char* buffer, uint16_t len) : _buffer(buffer), _bufferLength(len) { parseCmd(); }
 
+	// Flags
+	bool isSingleLetterFlagPresent(char f) const;
+	String getNumericalFlagValue(char f) const;
+	// Filenames
 	uint8_t getArgFirstFilenameOrLastArgIdx(uint8_t startIdx = 0) const;
 	Arg getArgFirstFilenameOrLastArg(uint8_t startIdx = 0) const;
-	Arg getArgFirstFlags() const;
 
 	void parseCmd();
 	void parseArgs();
@@ -104,6 +112,13 @@ struct LFSECommand {
 	operator String() const { return toString(); }
 };
 
+namespace std {
+	template <> struct hash<LFSECommand::Arg> {
+		size_t operator()(const LFSECommand::Arg& arg) const {
+			return std::hash<const char*>()(arg.value.begin()) ^ std::hash<uint16_t>()(arg.idx) ^ std::hash<size_t>()(static_cast<size_t>(arg.type));
+		}
+	};
+}
 
 typedef std::function<void(LFSECommand&)> cmdFunc;
 typedef std::tuple<cmdFunc, String, String> cmdInfo; // function, arguments description, command description
@@ -117,7 +132,6 @@ private:
 	static char lfseBuffer[];
 	static LFSEPath lfsePath;
 
-	static void _cmdWriteHelper(LFSECommand& cmd, bool append = false);
 	static void logExecutedCommand(const LFSECommand& cmd);
 	static void handleCommand(uint16_t length);
 
@@ -131,7 +145,6 @@ private:
 	static void cmdRm(LFSECommand& cmd);
 	static void cmdTouch(LFSECommand& cmd);
 	static void cmdWrite(LFSECommand& cmd);
-	// static void cmdAppend(LFSECommand& cmd);
 	static void cmdCat(LFSECommand& cmd);
 	static void cmdMan(LFSECommand& cmd);
 

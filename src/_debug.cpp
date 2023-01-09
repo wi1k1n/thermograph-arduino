@@ -12,7 +12,6 @@ std::map<String, cmdInfo> DEBUG::lfseCmdMap = {
 	cmdMapEntry("rm", cmdInfo(cmdRm, "[path]", "remove file/directory")),
 	cmdMapEntry("touch", cmdInfo(cmdTouch, "[filepath]", "create empty file")),
 	cmdMapEntry("write", cmdInfo(cmdWrite, "[\"content_args\"] [filepath]", "overwrite text content to file")),
-	// cmdMapEntry("append", cmdInfo(cmdAppend, "[\"content_args\"] [filepath]", "append text content to existing file")),
 	cmdMapEntry("cat", cmdInfo(cmdCat, "[filepath]", "print content of the file")),
 	cmdMapEntry("man", cmdInfo(cmdMan, "[command]", "show manual for command")),
 };
@@ -86,6 +85,7 @@ void DEBUG::cmdMkdir(LFSECommand& cmd) {
 	}
 }
 void DEBUG::cmdMv(LFSECommand& cmd) {
+	// TODO: handle dot in path properly to keep the name
 	cmd.parseArgs();
 	if (checkMissingOperand(cmd, 2))
 		return;
@@ -125,53 +125,88 @@ void DEBUG::cmdTouch(LFSECommand& cmd) {
 	f.close();
 }
 void DEBUG::cmdWrite(LFSECommand& cmd) {
-	_cmdWriteHelper(cmd);
+	cmd.parseArgs();
+	if (checkMissingOperand(cmd))
+		return;
+	uint8_t filePathArgIdx = cmd.getArgFirstFilenameOrLastArgIdx();
+	String userPath(cmd._args[filePathArgIdx]);
+	if (checkInvalidFilePath(userPath)) 
+		return;
+	String filePath(lfsePath.createAdjustedFromUserPath(userPath).toString());
+
+	// get flags
+	bool append = cmd.isSingleLetterFlagPresent('a');
+	bool newLines = !cmd.isSingleLetterFlagPresent('n');
+
+	File f = LittleFS.open(filePath, append ? "a" : "w+");
+	if (!f) {
+		LOG(F("Failed to open file "));
+		LOGLN(filePath);
+		return;
+	}
+	if (f.isDirectory()) {
+		if (checkIsADir(f, filePath)) {
+			f.close();
+			return;
+		}
+	}
+
+	// iterate over all string args that go before the filename arg
+	bool dirty = false;
+	for (uint8_t i = filePathArgIdx; i < cmd._args.size(); ++i) {
+		LFSECommand::Arg& arg = cmd._args[i];
+		if (arg.isTypeString()) {
+			dirty = true;
+			if (newLines)
+				f.println(arg.value);
+			else
+				f.print(arg.value);
+		}
+	}
+	f.close();
+	if (!dirty) {
+		LOGLN(F("Missing data to write"));
+	}
 }
-// void DEBUG::cmdAppend(LFSECommand& cmd) {
-// 	_cmdWriteHelper(cmd, true);
-// }
+
 void DEBUG::cmdRm(LFSECommand& cmd) {
 	cmd.parseArgs();
 	if (checkMissingOperand(cmd))
 		return;
 	
-	std::unordered_set<char> flags = cmd.getArgFirstFlags().getSingleCharFlagsSet();
-	bool removeDir = flags.find('r') != flags.end();
+	bool removeDir = cmd.isSingleLetterFlagPresent('r');
 
 	String userPath(cmd.getArgFirstFilenameOrLastArg());
+	if (removeDir ? checkInvalidDirPath(userPath) : checkInvalidFilePath(userPath))
+		return;
+
 	String path = lfsePath.createAdjustedFromUserPath(userPath).toString();
-	// r flag specified -> trying remove directory
-	if (removeDir) {
-		if (checkInvalidDirPath(userPath))
-			return;
-		if (checkDoesntExist(path))
-			return;
-		Dir dir = LittleFS.openDir(path);
-		if (dir.isDirectory()) {
-			if (!LittleFS.rmdir(path)) {
-				LOG(F("Failed to remove directory "));
-				LOGLN(path);
-			}
-		} else {
+	if (checkDoesntExist(path))
+		return;
+
+	File f = LittleFS.open(path, "w");
+	bool isDir = f.isDirectory();
+	f.close();
+	if (isDir) {
+		if (!removeDir) {
 			LOG(path);
-			LOGLN(F(" is not a directory"));
+			LOGLN(F(" is not a file"));
+			return;
+		}
+		if (!LittleFS.rmdir(path)) {
+			LOG(F("Failed to remove directory "));
+			LOGLN(path);
 		}
 		return;
 	}
-	// r flag is not present -> removing file
-	if (checkInvalidFilePath(userPath))
-		return;
-	if (checkDoesntExist(path))
-		return;
-	Dir dir = LittleFS.openDir(path);
-	if (dir.isFile()) {
-		if (!LittleFS.remove(path)) {
-			LOG(F("Failed to remove file "));
-			LOGLN(path);
-		}
-	} else {
+	if (removeDir) {
 		LOG(path);
-		LOGLN(F(" is not a file"));
+		LOGLN(F(" is not a directory"));
+		return;
+	}
+	if (!LittleFS.remove(path)) {
+		LOG(F("Failed to remove file "));
+		LOGLN(path);
 	}
 	return;
 }
@@ -196,33 +231,17 @@ void DEBUG::cmdCat(LFSECommand& cmd) {
 		f.close();
 		return;
 	}
+	
+	// get flags
+	bool lineNumbers = cmd.isSingleLetterFlagPresent('n');
+	bool byteView = cmd.isSingleLetterFlagPresent('b');
 
-	std::unordered_set<char> flags = cmd.getArgFirstFlags().getSingleCharFlagsSet();
-	bool lineNumbers = flags.find('n') != flags.end();
-	bool byteView = flags.find('b') != flags.end();
-
-	uint16_t limitColumn = 128;
-	uint16_t rowIdxFirst = 0;
-	uint16_t rowIdxLast = 64;
-	// TODO: change _args' type from vector to hashset and make this flag part easier
-	uint8_t limitsFound = 0;
-	auto handleCharLimit = [&](const LFSECommand::Arg& arg, char c, uint16_t& dst) {
-		if (arg.value[0] == c) {
-			int16_t t = arg.value.substring(1).toInt();
-			if (t > 0)
-				dst = t;
-			++limitsFound;
-		}
-	};
-	for (const LFSECommand::Arg& arg : cmd._args) {
-		if (arg.type != LFSECommand::Arg::Type::FLAG || arg.value.isEmpty())
-			continue;
-		handleCharLimit(arg, 'c', limitColumn);
-		handleCharLimit(arg, 'f', rowIdxFirst);
-		handleCharLimit(arg, 'l', rowIdxLast);
-		if (limitsFound == 3)
-			break;
-	}
+	String limitColsStr(cmd.getNumericalFlagValue('c'));
+	uint16_t limitColumn = limitColsStr.isEmpty() ? 128 : max((long)0, limitColsStr.toInt());
+	String rowIdxFirstStr(cmd.getNumericalFlagValue('f'));
+	uint16_t rowIdxFirst = rowIdxFirstStr.isEmpty() ? 0 : max((long)0, rowIdxFirstStr.toInt());
+	String rowIdxLastStr(cmd.getNumericalFlagValue('l'));
+	uint16_t rowIdxLast = rowIdxLastStr.isEmpty() ? 64 : max((long)0, rowIdxLastStr.toInt());;
 
 	uint16_t lineIdx = 0;
 	while (f.available() && lineIdx <= rowIdxLast) {
@@ -256,49 +275,6 @@ void DEBUG::cmdMan(LFSECommand& cmd) {
 	cmd.parseArgs();
 	if (checkMissingOperand(cmd))
 		return;
-}
-
-void DEBUG::_cmdWriteHelper(LFSECommand& cmd, bool append) {
-	cmd.parseArgs();
-	if (checkMissingOperand(cmd))
-		return;
-	uint8_t filePathArgIdx = cmd.getArgFirstFilenameOrLastArgIdx();
-	String userPath(cmd._args[filePathArgIdx]);
-	if (checkInvalidFilePath(userPath)) 
-		return;
-	String filePath(lfsePath.createAdjustedFromUserPath(userPath).toString());
-	File f = LittleFS.open(filePath, append ? "a" : "w+");
-	if (!f) {
-		LOG(F("Failed to open file "));
-		LOGLN(filePath);
-		return;
-	}
-	if (f.isDirectory()) {
-		if (checkIsADir(f, filePath)) {
-			f.close();
-			return;
-		}
-	}
-
-	std::unordered_set<char> flags = cmd.getArgFirstFlags().getSingleCharFlagsSet();
-	bool newLines = flags.find('n') != flags.end();
-
-	// iterate over all string args that go before the filename arg
-	bool dirty = false;
-	for (uint8_t i = filePathArgIdx; i < cmd._args.size(); ++i) {
-		LFSECommand::Arg& arg = cmd._args[i];
-		if (arg.type == LFSECommand::Arg::Type::STRING) {
-			dirty = true;
-			if (newLines)
-				f.println(arg.value);
-			else
-				f.print(arg.value);
-		}
-	}
-	f.close();
-	if (!dirty) {
-		LOGLN(F("Missing data to write"));
-	}
 }
 
 
@@ -481,17 +457,6 @@ LFSEPath LFSEPath::createAdjustedFromUserPath(String userPath) {
 
 ////////////
 
-std::vector<char> LFSECommand::Arg::getSingleCharFlagsList() const {
-	if (type != Type::FLAG)
-		return std::vector<char>();
-	return std::vector<char>(value.begin(), value.end());
-}
-std::unordered_set<char> LFSECommand::Arg::getSingleCharFlagsSet() const {
-	if (type != Type::FLAG)
-		return std::unordered_set<char>();
-	return std::unordered_set<char>(value.begin(), value.end());
-}
-
 void LFSECommand::parseCmd() {
 	String token;
 	uint16_t i = 0;
@@ -506,25 +471,36 @@ void LFSECommand::parseCmd() {
 	_cmd.toLowerCase();
 }
 
+
+bool LFSECommand::isSingleLetterFlagPresent(char f) const {
+	for (const Arg& arg : _args) {
+		if (!arg.isTypeFlag() || arg.value.isEmpty())
+			continue;
+		if (arg.value.indexOf(f) != -1)
+			return true;
+	}
+	return false;
+}
+String LFSECommand::getNumericalFlagValue(char f) const {
+	for (const Arg& arg : _args) {
+		if (arg.isFlagAndStartsWith(f)) {
+			return arg.value.substring(1);
+		}
+	}
+	return String();
+}
+
 uint8_t LFSECommand::getArgFirstFilenameOrLastArgIdx(uint8_t startIdx) const {
 	for (uint8_t i = startIdx; i < _args.size(); ++i) {
-		if (_args[i].type == Arg::Type::FILENAME) {
+		if (_args[i].isTypeFilename()) {
 			return i;
 		}
 	}
 	return 0xFF;
 }
+
 LFSECommand::Arg LFSECommand::getArgFirstFilenameOrLastArg(uint8_t startIdx) const {
 	return _args[getArgFirstFilenameOrLastArgIdx(startIdx)];
-}
-LFSECommand::Arg LFSECommand::getArgFirstFlags() const {
-	Arg flags;
-	for (const Arg& arg : _args)
-		if (arg.type == Arg::Type::FLAG) {
-			flags = arg;
-			break;
-		}
-	return flags;
 }
 
 void LFSECommand::parseArgs() {
@@ -553,7 +529,7 @@ void LFSECommand::parseArgs() {
 	};
 	for (uint16_t i = _cmdBufferCursor; i < _bufferLength; ++i) {
 		char c = _buffer[i];
-		if (token.type == Arg::Type::FILENAME) { // already filling filename arg
+		if (token.isTypeFilename()) { // already filling filename arg
 			if (isValidFSPathChar(c)) {
 				token.value += c;
 				continue;
@@ -561,7 +537,7 @@ void LFSECommand::parseArgs() {
 			addToken(); // if not valid filename char -> save token
 			continue;
 		}
-		if (token.type == Arg::Type::FLAG) { // already filling flag arg
+		if (token.isTypeFlag()) { // already filling flag arg
 			if (isAlphaNumeric(c)) { // flag args are only alphanumeric
 				token.value += c;
 				continue;
@@ -569,7 +545,7 @@ void LFSECommand::parseArgs() {
 			addToken(); // if not valid flag char -> save token
 			continue;
 		}
-		if (token.type == Arg::Type::STRING) { // already filling string filename arg
+		if (token.isTypeString()) { // already filling string filename arg
 			if (c == '"') { // potentially end of string arg
 				if (prevCharEscape) { // no, it was escaped
 					strArgAddChar(c);
@@ -626,7 +602,7 @@ void LFSECommand::parseArgs() {
 	if (prevCharEscape) { // if '\' was the last symbol, add it
 		strArgAddChar('\\');
 	}
-	addToken(token.type != Arg::Type::STRING);
+	addToken(!token.isTypeString());
 	_argsParsed = true;
 }
 
