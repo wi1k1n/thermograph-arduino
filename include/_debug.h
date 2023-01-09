@@ -4,138 +4,108 @@
 #include "sdk.h"
 #ifdef TDEBUG
 
+#ifndef LOG
+#define LOG(txt)    	(Serial.print(txt))
+#endif
+#ifndef LOGLN
+#define LOGLN(txt)		(Serial.println(txt))
+#endif
+
 #include <map>
+#include <unordered_set>
 #include <vector>
 #include <functional>
+#include "LittleFS.h"
 
 // #define LFSE_COMMAND_MAX_LENGTH 10
 #define LFSE_SERIAL_BUFFER_LENGTH 64
 
-inline static bool isValidFSNameChar(char c) { return isAlphaNumeric(c) || c == '-'; }
-static bool isValidFSName(const String& name) { for (const char& c : name) if (!isValidFSNameChar(c)) return false; return !name.isEmpty(); }
-static bool isValidFSPath(const String& name) { for (const char& c : name) if (!isValidFSNameChar(c) && c != '/') return false; return !name.isEmpty(); }
+inline static bool isValidFSNameChar(char c) {
+	return isAlphaNumeric(c) || c == '-' || c == '.';
+}
+inline static bool isValidFSPathChar(char c) {
+	return isValidFSNameChar(c) || c == '/';
+}
+static bool isValidFSName(const String& name) {
+	if (name.isEmpty())
+		return false;
+	for (const char& c : name)
+		if (!isValidFSNameChar(c))
+			return false;
+	return true;
+}
+static bool isValidFSPath(const String& path) {
+	if (path.isEmpty())
+		return false;
+	for (const char& c : path)
+		if (!isValidFSNameChar(c) && c != '/')
+			return false;
+	return true;
+}
 
 struct LFSEPath {
 	std::vector<String> _tokens;
 
 	LFSEPath() = default;
-	LFSEPath(const LFSEPath& obj) {
-		for (const String& token : obj._tokens)
-			_tokens.push_back(token);
-	}
-	LFSEPath(const String& root) {
-		tokenize(root);
-	}
+	LFSEPath(const LFSEPath& obj);
+	LFSEPath(const String& root);
 
 	// replaces if path is absolute, adds if relative
-	void adjust(const String& path) {
-		if (path.isEmpty() || !isValidFSPath(path)) {
-			return;
-		}
-		// DLOG("adjust current path ");
-		// LOG(toString());
-		// LOG(" with path ");
-		// LOGLN(path);
-		tokenize(path, path[0] != '/');
-		// DLOG("after adjustment ");
-		// LOGLN(toString());
-	}
-
+	void adjust(const String& path);
 	bool isEmpty() const { return _tokens.size(); }
-	String toString(bool trailingSlash = false) const {
-		String res;
-		for (const String& token : _tokens) {
-			res += "/";
-			res += token;
-		}
-		if (trailingSlash || res.isEmpty())
-			res += "/";
-		return res;
-	}
+	String toString(bool trailingSlash = false) const;
+
+	LFSEPath createAdjustedFromUserPath(String userPath);
 private:
-	void tokenize(const String& s, bool appendToExisting = false) {
-		if (!appendToExisting)
-			_tokens.clear();
-		String token;
-		for (uint16_t i = 0; i < s.length(); ++i) {
-			char c = s[i];
-			if (isValidFSNameChar(c)) {
-				token += c;
-				continue;
-			}
-			if (c == '/') {
-				if (token.length()) {
-					_tokens.push_back(token);
-					token.clear();
-				}
-			}
-		}
-		if (token.length()) {
-			_tokens.push_back(std::move(token));
-		}
-	}
+	void tokenize(const String& s, bool appendToExisting = false);
 };
 
-struct LSFECommand {
+struct LFSECommand {
+	struct Arg {
+		enum class Type {
+			NONE = -1,
+			FILENAME = 0,
+			FLAG,
+			STRING
+		} type = Type::NONE;
+		String value;
+		uint16_t idx = 0;
+
+		std::vector<char> getSingleCharFlagsList() const;
+		std::unordered_set<char> getSingleCharFlagsSet() const;
+		String toString(bool onlyContent = true) const {
+			if (onlyContent)
+				return value;
+			return (type == Type::FLAG ? "-" : (type == Type::STRING ? "\"" : "")) + value + (type == Type::STRING ? "\"" : "");
+		}
+		operator String() const { return toString(); }
+
+		bool operator<(const Arg& rhs) const { return idx < rhs.idx; }
+	};
+
 	String _cmd;
-	std::vector<String> _args;
+	std::vector<Arg> _args; // TODO: should be hashset?
 	char* _buffer = nullptr;
 	uint16_t _bufferLength = 0;
+	bool _argsParsed = false;
+	uint8_t _cmdBufferCursor = 0;
 
-	LSFECommand(char* buffer, uint16_t len) : _buffer(buffer), _bufferLength(len) {
-		parse(buffer, len);
-	}
+	LFSECommand() = default;
+	LFSECommand(char* buffer, uint16_t len) : _buffer(buffer), _bufferLength(len) { parseCmd(); }
 
-	String toString() const {
-		String res(_cmd);
-		for (const String& arg : _args) {
-			res += " ";
-			res += arg;
-		}
-		return res;
-	}
-private:
-	void parse(char* buffer, uint16_t len) {
-		_cmd.clear();
-		_args.clear();
-		String token;
-		for (uint16_t i = 0; i < len; ++i) {
-			char c = buffer[i];
-			if (isValidFSNameChar(c) || c == '/') {
-				// DLOGLN(c);
-				token += c;
-			} else {
-				// LOGLN("!isAlphaNumeric()");
-				if (!_cmd.length()) { // skip leading spaces (and bulshit)
-					// LOGLN("!_cmd.length()");
-					if (token.length()) {
-						// DLOGLN(token);
-						_cmd = std::move(token);
-						token.clear();
-					}
-					continue;
-				}
-				if (token.length()) {
-					// DLOGLN(token);
-					_args.push_back(std::move(token));
-					token.clear();
-				}
-				continue;
-			}
-		}
-		if (token.length()) {
-			if (!_cmd.length()) {
-				_cmd = std::move(token);
-			} else {
-				_args.push_back(std::move(token));
-			}
-		}
-		_cmd.toLowerCase();
-	}
+	uint8_t getArgFirstFilenameOrLastArgIdx(uint8_t startIdx = 0) const;
+	Arg getArgFirstFilenameOrLastArg(uint8_t startIdx = 0) const;
+	Arg getArgFirstFlags() const;
+
+	void parseCmd();
+	void parseArgs();
+
+	String toString() const;
+	operator String() const { return toString(); }
 };
 
 
-typedef std::function<void(const LSFECommand&)> cmdFunc;
+typedef std::function<void(LFSECommand&)> cmdFunc;
 typedef std::tuple<cmdFunc, String, String> cmdInfo; // function, arguments description, command description
 typedef std::pair<String, cmdInfo> cmdMapEntry;
 
@@ -147,20 +117,31 @@ private:
 	static char lfseBuffer[];
 	static LFSEPath lfsePath;
 
-	static void logExecutedCommand(const LSFECommand& cmd);
-
-	static void cmdHelp(const LSFECommand& cmd);
-	static void cmdFormat(const LSFECommand& cmd);
-	static void cmdLs(const LSFECommand& cmd);
-	static void cmdCd(const LSFECommand& cmd);
-	static void cmdPwd(const LSFECommand& cmd);
-	static void cmdMkdir(const LSFECommand& cmd);
-	static void cmdMv(const LSFECommand& cmd);
-	static void cmdRm(const LSFECommand& cmd);
-	static void cmdCat(const LSFECommand& cmd);
-	static void cmdMan(const LSFECommand& cmd);
-
+	static void _cmdWriteHelper(LFSECommand& cmd, bool append = false);
+	static void logExecutedCommand(const LFSECommand& cmd);
 	static void handleCommand(uint16_t length);
+
+	static void cmdHelp(LFSECommand& cmd);
+	static void cmdFormat(LFSECommand& cmd);
+	static void cmdLs(LFSECommand& cmd);
+	static void cmdCd(LFSECommand& cmd);
+	static void cmdPwd(LFSECommand& cmd);
+	static void cmdMkdir(LFSECommand& cmd);
+	static void cmdMv(LFSECommand& cmd);
+	static void cmdRm(LFSECommand& cmd);
+	static void cmdTouch(LFSECommand& cmd);
+	static void cmdWrite(LFSECommand& cmd);
+	// static void cmdAppend(LFSECommand& cmd);
+	static void cmdCat(LFSECommand& cmd);
+	static void cmdMan(LFSECommand& cmd);
+
+	static bool checkIsAFile(const File& f, const String& path);
+	static bool checkIsADir(const File& f, const String& path);
+	static bool checkMissingOperand(LFSECommand& cmd, uint8_t nRequiredArgs = 1, LFSECommand::Arg::Type requiredType = LFSECommand::Arg::Type::FILENAME);
+	static bool checkInvalidDirPath(const String& path);
+	static bool checkInvalidFilePath(const String& path);
+	static bool checkAlreadyExists(const String& path);
+	static bool checkDoesntExist(const String& path);
 };
 
 #endif // #ifdef TDEBUG

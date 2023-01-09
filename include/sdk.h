@@ -38,28 +38,42 @@ enum class DLTransitionStyle {
 };
 
 #ifdef TDEBUG
-#define __PRIVATE_LOG_PREAMBULE(txt)   do {\
-											Serial.print(__FILE__);\
-											Serial.print(F(":"));\
-											Serial.print(__LINE__);\
-											Serial.print(F(":"));\
-											Serial.print(__func__);\
-											Serial.print(F("() - "));\
-										} while(false)
-#define DLOGLN(txt)  do {\
-						__PRIVATE_LOG_PREAMBULE(txt);\
-						Serial.println(txt);\
-					} while(false)
-#define DLOG(txt)    do {\
-						__PRIVATE_LOG_PREAMBULE(txt);\
-						Serial.print(txt);\
-					} while(false)
-#define LOGLN(txt)  do {\
-						Serial.println(txt);\
-					} while(false)
-#define LOG(txt)    do {\
-						Serial.print(txt);\
-					} while(false)
+// #define __PRIVATE_LOG_PREAMBULE(txt)   do {\
+// 											Serial.print(__FILE__);\
+// 											Serial.print(F(":"));\
+// 											Serial.print(__LINE__);\
+// 											Serial.print(F(":"));\
+// 											Serial.print(__func__);\
+// 											Serial.print(F("() - "));\
+// 										} while(false)
+// #define DLOGLN(txt)  do {\
+// 						__PRIVATE_LOG_PREAMBULE(txt);\
+// 						Serial.println(txt);\
+// 					} while(false)
+// #define DLOG(txt)    do {\
+// 						__PRIVATE_LOG_PREAMBULE(txt);\
+// 						Serial.print(txt);\
+// 					} while(false)
+// #define LOGLN(txt)	do {\
+// 						Serial.println(txt);\
+// 					} while(false)
+// #define LOG(txt)    do {\
+// 						Serial.print(txt);\
+// 					} while(false)
+#define __PRIVATE_LOG_PREAMBULE	   (Serial.print(millis())+\
+									Serial.print(" | ")+\
+									Serial.print(__FILE__)+\
+									Serial.print(F(":"))+\
+									Serial.print(__LINE__)+\
+									Serial.print(F(":"))+\
+									Serial.print(__func__)+\
+									Serial.print(F("() - ")))
+#define DLOGLN(txt)		(__PRIVATE_LOG_PREAMBULE+Serial.println(txt))
+#define DLOGF(fmt, ...)	(__PRIVATE_LOG_PREAMBULE+Serial.printf(fmt, __VA_ARGS__))
+#define DLOG(txt)    	(__PRIVATE_LOG_PREAMBULE+Serial.print(txt))
+#define LOGLN(txt)		(Serial.println(txt))
+#define LOGF(fmt, ...)	(Serial.printf(fmt, __VA_ARGS__))
+#define LOG(txt)    	(Serial.print(txt))
 #else
 #define DLOGLN(txt) do {} while(false)
 #define DLOG(txt) do {} while(false)
