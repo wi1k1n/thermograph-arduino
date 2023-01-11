@@ -33,12 +33,13 @@ class Application {
 	PushButton _btn2;
 	TempSensor _sensorTemp;
 
-	void measureTemperature();
 	void showDisplayError();
 public:
 	bool setup();
 	void loop();
 
+	void makeMeasurement();
+	
 	inline DisplayLayout* getActiveDisplayLayout() { return _dLayouts[_dLayoutActiveKey].get(); }
 	void activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransitionStyle style = DLTransitionStyle::AUTO);
 	

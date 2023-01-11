@@ -4,7 +4,7 @@
 #include "lfsexplorer.h"
 #endif
 
-void Application::measureTemperature() {
+void Application::makeMeasurement() {
 	// TODO: refactor in a proper way
 	if (_sensorTemp.measure()) {
 		TempSensorData* dataPtr = static_cast<TempSensorData*>(_sensorTemp.waitForMeasurement());
@@ -25,9 +25,9 @@ void Application::measureTemperature() {
 bool Application::setup() {
 	// TODO: Serial is only for debugging purposes for now
 	#ifdef TDEBUG
-		Serial.begin(115200);
+		_UART_.begin(115200);
 		delay(1);
-		Serial.println();
+		_UART_.println();
 	#endif
 	DLOGLN(F("Welcome to Thermograph v2"));
 
@@ -103,7 +103,6 @@ bool Application::setup() {
 	if (!_sensorTemp.init())
 		return false;
 	DLOGLN(F("Sensor temp initialized"));
-	measureTemperature();
 	
 	if (isModeInteract()) {
 		activateDisplayLayout(DisplayLayoutKeys::WELCOME, DLTransitionStyle::NONE);
@@ -117,7 +116,7 @@ bool Application::setup() {
 void Application::loop() {
 #ifdef TDEBUG
 	if (_mode == Mode::_DEBUG_LITTLEFS_EXPLORER)
-		return DEBUG::LittleFSExplorer();
+		return DEBUG::LittleFSExplorer("");
 #endif
 	_display.tick(); // out of the interact mode scope because of display error led timer
 	if (isInteractionAvailable()) {
@@ -170,17 +169,17 @@ void loop() {
 
 // // Sanity Test deep sleep
 // void setup() {
-//   Serial.begin(115200);
-//   while(!Serial) { }
-//   Serial.println();
-//   Serial.println("Start device in normal mode!");
+//   _UART_.begin(115200);
+//   while(!_UART_) { }
+//   _UART_.println();
+//   _UART_.println("Start device in normal mode!");
  
 //   delay(5000);
 //   // Wait for serial to initialize.
-//   while(!Serial) { }
+//   while(!_UART_) { }
  
 //   // Deep sleep mode for 10 seconds, the ESP8266 wakes up by itself when GPIO 16 (D0 in NodeMCU board) is connected to the RESET pin
-//   Serial.println("I'm awake, but I'm going into deep sleep mode for 10 seconds");
+//   _UART_.println("I'm awake, but I'm going into deep sleep mode for 10 seconds");
 //   ESP.deepSleep(10e6);
 // }
  
@@ -190,9 +189,9 @@ void loop() {
 // // Sanity test display
 // Display _display;
 // void setup() {
-// 	Serial.begin(115200);
+// 	_UART_.begin(115200);
 // 	delay(1);
-// 	Serial.println();
+// 	_UART_.println();
 // 	_display.init(&Wire, 0, 0x3C);
 // 	delay(100);
 
@@ -206,17 +205,18 @@ void loop() {
 // 	_display->display();
 // }
 // void loop() {
-// 	Serial.print(millis());
-// 	Serial.println(" hey!");
+// 	_UART_.print(millis());
+// 	_UART_.println(" hey!");
 // 	delay(500);
 // }
 
 // // LittleFS serial file explorer
 // void setup() {
-// 	Serial.begin(115200);
+// 	_UART_.begin(115200);
 // 	delay(1);
-// 	Serial.println();
+// 	_UART_.println();
+// 	LittleFS.begin();
 // }
 // void loop() {
-// 	DEBUG::LittleFSExplorer();
+// 	DEBUG::_debug();
 // }

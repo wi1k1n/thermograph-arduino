@@ -196,6 +196,7 @@ bool DLayoutMain::init(Display* display, Application* app, PushButton* btn1, Pus
 	const uint8_t dWidth = _display->rawWidth();
     const uint16_t bY = _display->rawHeight() - bHeight;
 	return success
+		&& _timerMeasure.init(DISPLAY_LAYOUT_MAIN_MEASUREMENT_PERIOD)
         && _gBtnStart.init(display, {(dWidth - bWidth) / 2, bY}, bSize, "Start")
         && _gBtnResume.init(display, {(dWidth - 2 * bWidth - bPadding) / 2, bY}, bSize, "Resume", 0)
         && _gBtnStop.init(display, {(dWidth - 2 * bWidth - bPadding) / 2 + bWidth + bPadding, bY}, bSize, "Stop", 0);
@@ -208,66 +209,77 @@ void DLayoutMain::activate() {
 		DLOGLN(F("DLMain activated in I mode"));
 		adjustGButtonsModeInteract();
     }
+	_timerMeasure.start();
     DisplayLayout::activate();
+}
+void DLayoutMain::deactivate() {
+	_timerMeasure.stop();
+    DisplayLayout::deactivate();
 }
 void DLayoutMain::update(void* data) {
 	DisplayLayout::draw(data);
 	TempSensorData* tempData = static_cast<TempSensorData*>(data);
 	_temp1 = tempData->temp;
+	draw();
 }
 void DLayoutMain::tick() {
 	DisplayLayout::tick();
-	// Don't waste time if nothing to process
+
+	if (_timerMeasure.tick()) {
+		_app->makeMeasurement();
+	}
+
+	// Don't waste time if no user control to process
 	if (!_btn1->tick() && !_btn2->tick()) {
-		_debugLED.off();
+		// _debugLED.off();
 		return;
 	}
-	_debugLED.on();
+	// _debugLED.on();
 	
 	// Only if btn2 is NOT pressed
 	if (!_btn2->down()) {
-		LOGLN("!2state");
+		// LOGLN("!2state");
 		if (_app->isModeInteract()) {
-			LOGLN("Mode I");
+			// LOGLN("Mode I");
 			if (_gBtnStart.isFocused()) {
-				LOGLN("gbtnStart focused");
+				// LOGLN("gbtnStart focused");
 				if (_btn1->release()) {
-					LOGLN("1release -> change mode BI");
+					// LOGLN("1release -> change mode BI");
 					_app->setModeBackgroundInterrupted();
 					activate(); // TODO: turn off directly
 				}
 			} else {
-				LOGLN("gbtnStart !focused");
+				// LOGLN("gbtnStart !focused");
 				if (_btn1->click()) {
-					LOGLN(F("1click -> change menu to Settings"));
+					// LOGLN(F("1click -> change menu to Settings"));
 					_app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
 				}
 				if (_btn1->held()) {
-					LOGLN("1held -> gbtnStart set focused");
+					// LOGLN("1held -> gbtnStart set focused");
 					_gBtnStart.setFocused(true, true, true);
 				}
 			}
 		} else if (_app->isModeBackgroundInterrupted()) {
-			LOGLN("Mode BI");
+			// LOGLN("Mode BI");
 			if (_btn1->click()) {
-				LOGLN(F("1click -> change menu to Settings"));
+				// LOGLN(F("1click -> change menu to Settings"));
 				_app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
 			}
 		}
 	}
 	// Only if btn1 NOT pressed
 	if (!_btn1->down()) {
-		LOGLN("!1state");
+		// LOGLN("!1state");
 		if (_app->isModeInteract()) {
-			LOGLN("Mode I");
+			// LOGLN("Mode I");
 			if (_btn2->click()) {
-				LOGLN(F("2click -> change menu to Graph"));
+				// LOGLN(F("2click -> change menu to Graph"));
 				_app->activateDisplayLayout(DisplayLayoutKeys::GRAPH);
 			}
 		} else if (_app->isModeBackgroundInterrupted()) {
-			LOGLN("Mode BI");
+			// LOGLN("Mode BI");
 			if (_btn2->click()) {
-				LOGLN(F("2click -> change mode to I"));
+				// LOGLN(F("2click -> change mode to I"));
 				_app->setModeInteract();
 				activate(); // TODO: turn off directly
 			}
@@ -284,7 +296,7 @@ void DLayoutMain::draw(bool doDisplay) {
 	char buffer[16];
 	dtostrf(_temp1, 6, 1, buffer);
 	
-	display()->setCursor(0, DISPLAY_LAYOUT_PADDING_TOP);
+	display()->setCursor(0, 16);
 	display()->setTextSize(3);
 	display()->print(buffer);
 

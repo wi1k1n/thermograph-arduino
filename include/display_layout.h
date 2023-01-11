@@ -88,6 +88,8 @@ class DLayoutMain : public DisplayLayout {
     DLButton _gBtnResume;
     DLButton _gBtnStop;
 
+	Timer _timerMeasure;
+
 	LED _debugLED;
 	
 	void drawGButtons(bool doDisplay = false);
@@ -96,6 +98,7 @@ class DLayoutMain : public DisplayLayout {
 public:
 	bool init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) override;
 	void activate() override;
+	void deactivate() override;
 	void draw(bool doDisplay = true) override;
 	void update(void* data) override;
 	void tick() override;
