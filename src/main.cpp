@@ -21,6 +21,22 @@ void Application::makeMeasurement() {
 		LOGLN(F("Couldn't start measuring temperature!"));
 	}
 }
+bool Application::startBackgroundJob() {
+	const SStrSleeping& sleeping = Storage::getSleeping();
+	if (!Storage::setSleeping(millis() + sleeping.timeAwake, _mode))
+		return false;
+	if (isModeInteract() || isModeBackgroundInterrupted()) {
+		_display->clearDisplay();
+		_display->display();
+	}
+	ESP.deepSleep(5e6);
+	return true;
+}
+
+bool Application::stopBackgroundJob() {
+	setModeInteract();
+	return Storage::removeSleeping();
+}
 
 bool Application::setup() {
 	// TODO: Serial is only for debugging purposes for now
@@ -31,10 +47,9 @@ bool Application::setup() {
 	#endif
 	DLOGLN(F("Welcome to Thermograph v2"));
 
-	if (!Storage::init()) {
+	if (!ThFS::init())
 		return false;
-	}
-	DLOGLN(F("Storage manager initialized"));
+	DLOGLN(F("ThFS initialized"));
 
 	if (!_btn1.init(INTERACT_PUSHBUTTON_1_PIN))
 		return false;
@@ -47,12 +62,22 @@ bool Application::setup() {
 	if (!_btn1.tick() && _btn2.tick()) {
 		DLOGLN(F("[DEBUG] LittleFS explorer mode! Run 'help' to check available commands."));
 		_mode = Mode::_DEBUG_LITTLEFS_EXPLORER;
+		_display->clearDisplay();
+		_display->print(F("LFSexplorer mode"));
+		_display->display();
 		return true;
 	}
 #endif
+
+	if (!Storage::init()) {
+		return false;
+	}
+	DLOGLN(F("Storage manager initialized"));
 	
 	// If not sleeping -> INTERACT mode
-	if (!Storage::isSleeping()) {
+	const SStrSleeping& sleepingEntry = Storage::getSleeping(true);
+	bool isSleeping = sleepingEntry.timeAwake > 0;
+	if (!isSleeping) {
 		_mode = Mode::INTERACT;
 #ifdef TDEBUG // Hold btn1 to force app to load in BI mode
 		delay(MODE_DETECTION_DELAY);
@@ -62,7 +87,8 @@ bool Application::setup() {
 		}
 #endif
 	} else {
-		DLOG(F("Storage manager: isSleeping() == true"));
+		DLOG(F("isSleeping == true: timeAwake = "));
+		LOGLN(sleepingEntry.timeAwake);
 		// Decide what mode are we loading in
 		delay(MODE_DETECTION_DELAY);
 		if (_btn1.tick() && _btn2.tick()) {
@@ -107,7 +133,8 @@ bool Application::setup() {
 	if (isModeInteract()) {
 		activateDisplayLayout(DisplayLayoutKeys::WELCOME, DLTransitionStyle::NONE);
 	} else if (isModeBackgroundInterrupted()) {
-		activateDisplayLayout(DisplayLayoutKeys::BACKGROUND_INTERRUPTED, DLTransitionStyle::NONE);
+		activateDisplayLayout(DisplayLayoutKeys::MAIN, DLTransitionStyle::NONE);
+		// activateDisplayLayout(DisplayLayoutKeys::BACKGROUND_INTERRUPTED, DLTransitionStyle::NONE); // TODO: remove this display layout at all!
 	}
 
 	return true;

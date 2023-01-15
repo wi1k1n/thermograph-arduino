@@ -8,6 +8,9 @@
 #define TDEBUG
 #define SSD1306_NO_SPLASH
 
+#define THERMOGRAPH_VERSION_MAJOR 2
+#define THERMOGRAPH_VERSION_MINOR 0
+
 static const uint16_t MODE_DETECTION_DELAY = 250; // ms
 
 static const int8_t DISPLAY_PIN_RESET = -1;
@@ -19,7 +22,8 @@ static const uint16_t DISPLAY_LAYOUT_MAIN_MEASUREMENT_PERIOD = 1000; // ms
 static const uint8_t INTERACT_PUSHBUTTON_1_PIN = 14; //D5 0; // D3
 static const uint8_t INTERACT_PUSHBUTTON_2_PIN = 12; //D6 2; // D4
 
-static const char STORAGEKEY_CONFIG[] PROGMEM = "config";
+static const char STORAGEKEY_CONFIG[] = "/config";
+static const char STORAGEKEY_ISSLEEPING[] = "/issleeping";
 
 enum DisplayLayoutKeys {
 	NONE = -1,

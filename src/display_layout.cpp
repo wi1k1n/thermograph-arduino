@@ -245,8 +245,10 @@ void DLayoutMain::tick() {
 				// LOGLN("gbtnStart focused");
 				if (_btn1->release()) {
 					// LOGLN("1release -> change mode BI");
-					_app->setModeBackgroundInterrupted();
-					activate(); // TODO: turn off directly
+					// _app->setModeBackgroundInterrupted();
+					// activate(); // TODO: turn off directly
+					if (!_app->startBackgroundJob())
+						DLOGLN("Couldn't start background job!");
 				}
 			} else {
 				// LOGLN("gbtnStart !focused");
@@ -280,8 +282,9 @@ void DLayoutMain::tick() {
 			// LOGLN("Mode BI");
 			if (_btn2->click()) {
 				// LOGLN(F("2click -> change mode to I"));
-				_app->setModeInteract();
-				activate(); // TODO: turn off directly
+				// _app->setModeInteract();
+				// activate(); // TODO: turn off directly
+				_app->stopBackgroundJob();
 			}
 		}
 	}
