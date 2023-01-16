@@ -3,6 +3,11 @@
 #ifdef TDEBUG
 #include "lfsexplorer.h"
 #endif
+#include "display/dlayouts/dl_bginterrupted.h"
+#include "display/dlayouts/dl_graph.h"
+#include "display/dlayouts/dl_main.h"
+#include "display/dlayouts/dl_settings.h"
+#include "display/dlayouts/dl_welcome.h"
 
 void Application::makeMeasurement() {
 	// TODO: refactor in a proper way
@@ -12,7 +17,7 @@ void Application::makeMeasurement() {
 			if (isInteractionAvailable()) {
 				_dLayouts[DisplayLayoutKeys::MAIN]->update(dataPtr);
 			}
-			LOG(F("Temperature: "));
+			// LOG(F("Temperature: "));
 			LOGLN(dataPtr->temp);
 		} else {
 			LOGLN(F("Couldn't get measurement even after 1s!"));
@@ -35,6 +40,7 @@ bool Application::startBackgroundJob() {
 
 bool Application::stopBackgroundJob() {
 	setModeInteract();
+	activateDisplayLayout(DisplayLayoutKeys::MAIN, DLTransitionStyle::NONE, true);
 	return Storage::removeSleeping();
 }
 
@@ -62,9 +68,15 @@ bool Application::setup() {
 	if (!_btn1.tick() && _btn2.tick()) {
 		DLOGLN(F("[DEBUG] LittleFS explorer mode! Run 'help' to check available commands."));
 		_mode = Mode::_DEBUG_LITTLEFS_EXPLORER;
-		_display->clearDisplay();
-		_display->print(F("LFSexplorer mode"));
-		_display->display();
+		if (_display.init()) {
+			delay(1);
+			_display->clearDisplay();
+			_display->setTextColor(DISPLAY_WHITE);
+			_display->setCursor(0, 0);
+			_display->setTextSize(1);
+			_display->print(F("LFSexplorer mode"));
+			_display->display();
+		}
 		return true;
 	}
 #endif
@@ -101,7 +113,7 @@ bool Application::setup() {
 
 	if (isInteractionAvailable()) {
 		// Init display at first place as this is must have in user interaction mode
-		if (!_display.init(&Wire, 0, 0x3C))
+		if (!_display.init())
 			return false;
 		DLOGLN(F("Display initialized"));
 		_display->clearDisplay();
@@ -152,8 +164,8 @@ void Application::loop() {
 	}
 }
 
-void Application::activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransitionStyle style) {
-	if (!isInteractionAvailable() || dLayoutKey == DisplayLayoutKeys::NONE || dLayoutKey == _dLayoutActiveKey) {
+void Application::activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransitionStyle style, bool force) {
+	if (!isInteractionAvailable() || dLayoutKey == DisplayLayoutKeys::NONE || (dLayoutKey == _dLayoutActiveKey && !force)) {
 		return;
 	}
 	DisplayLayout* target = _dLayouts[dLayoutKey].get();

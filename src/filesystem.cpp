@@ -1,5 +1,6 @@
 #include "filesystem.h"
 #include "sdk.h"
+#include <type_traits>
 
 bool ThFS::init() { return LittleFS.begin(); }
 bool ThFS::exists(const char* path) { return LittleFS.exists(path); }
@@ -14,7 +15,8 @@ File ThFS::openA(const char* path) { return open(path, "a"); }
 File ThFS::openRW(const char* path) { return open(path, "r+"); }
 File ThFS::openRA(const char* path) { return open(path, "a+"); }
 template <typename T>
-bool ThFS::readStruct(File& f, T& s) {
+bool ThFS::readStruct(File& f, T& s, bool ignoreVersion) {
+	static_assert(std::is_base_of_v<StorageStruct, T>);
 	int availableBytes = f.available();
 	// DLOGLN(availableBytes);
 	size_t byteCount = sizeof(T);
@@ -27,10 +29,23 @@ bool ThFS::readStruct(File& f, T& s) {
 	if (byteCountRead != byteCount)
 		return false;
 	s = T(*reinterpret_cast<T*>(buffer));
-	return true;
+	if (ignoreVersion)
+		return true;
+	StorageStruct* ss = static_cast<StorageStruct*>(&s);
+#ifdef TDEBUG
+	if (!ss) {
+		DLOGLN(F("!ss"));
+	} else if (ss->versionMajor != THERMOGRAPH_VERSION_MAJOR || ss->versionMinor != THERMOGRAPH_VERSION_MINOR) {
+		DLOG(F("File ")); LOG(f.fullName()); LOG(F(" has wrong version: "));
+		LOG(ss->versionMajor); LOG(F(".")); LOG(ss->versionMinor);
+		LOG(F(". Expected: ")); LOG(THERMOGRAPH_VERSION_MAJOR); LOG(F(".")); LOGLN(THERMOGRAPH_VERSION_MINOR);
+	}
+#endif
+	return ss && ss->versionMajor == THERMOGRAPH_VERSION_MAJOR && ss->versionMinor == THERMOGRAPH_VERSION_MINOR;
 }
 template <typename T>
 bool ThFS::writeStruct(File& f, T& s) {
+	static_assert(std::is_base_of_v<StorageStruct, T>);
 	size_t byteCount = sizeof(T);
 	// DLOGLN(byteCount);
 	size_t byteCountWritten = f.write(reinterpret_cast<char*>(&s), byteCount);
@@ -40,8 +55,8 @@ bool ThFS::writeStruct(File& f, T& s) {
 
 /// ////////////////////////////////////
 
-uint8_t StorageStruct::versionMajor = THERMOGRAPH_VERSION_MAJOR;
-uint8_t StorageStruct::versionMinor = THERMOGRAPH_VERSION_MINOR;
+// uint8_t StorageStruct::versionMajor = THERMOGRAPH_VERSION_MAJOR;
+// uint8_t StorageStruct::versionMinor = THERMOGRAPH_VERSION_MINOR;
 SStrConfig Storage::_config;
 SStrSleeping Storage::_sleeping;
 

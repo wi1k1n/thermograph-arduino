@@ -1,14 +1,15 @@
 #include "sdk.h"
-#include "display.h"
-#include "display_layout.h"
+#include "display/display.h"
+#include "display/display_layout.h"
 
 Display::~Display() {
 	disable();
 }
 
-bool Display::init(TwoWire* wire, uint8_t rst, uint8_t addr) {
-	_display = std::unique_ptr<Adafruit_SSD1306>(new Adafruit_SSD1306(rawWidth(), rawHeight(), wire, rst));
-	if (_display == nullptr || !_display->begin(SSD1306_SWITCHCAPVCC, addr)) {
+// bool Display::init(TwoWire* wire, uint8_t rst, uint8_t addr) {
+bool Display::init() {
+	_display = std::unique_ptr<Adafruit_SSD1306>(new Adafruit_SSD1306(rawWidth(), rawHeight(), &Wire, DISPLAY_PIN_RESET));
+	if (_display == nullptr || !_display->begin(SSD1306_SWITCHCAPVCC, DISPLAY_ADDRESS)) {
 		_timerLEDError.init(LED_BUILTIN);
 		_timerLEDError.setIntervals(4, (const uint16_t[]){ 50, 100, 150, 100 });
 		_timerLEDError.restart();

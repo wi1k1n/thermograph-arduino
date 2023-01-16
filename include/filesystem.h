@@ -21,9 +21,8 @@ public:
 	static File openRW(const char* path);
 	static File openRA(const char* path);
 
-	
 	template <typename T>
-	static bool readStruct(File& f, T& s);
+	static bool readStruct(File& f, T& s, bool ignoreVersion = false);
 	template <typename T>
 	static bool writeStruct(File& f, T& s);
 };
@@ -31,10 +30,10 @@ public:
 /// //////////////////////////////
 
 struct StorageStruct {
-	static uint8_t versionMajor;
-	static uint8_t versionMinor;
+	uint8_t versionMajor;
+	uint8_t versionMinor;
 
-	StorageStruct() = default;
+	StorageStruct() : versionMajor(THERMOGRAPH_VERSION_MAJOR), versionMinor(THERMOGRAPH_VERSION_MINOR) { }
 	StorageStruct(const StorageStruct&) = default;
 };
 struct SStrSleeping : StorageStruct {

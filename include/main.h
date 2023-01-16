@@ -3,10 +3,9 @@
 
 #include "Arduino.h"
 #include "sdk.h"
-#include "display.h"
-#include "display_layout.h"
+#include "display/display.h"
+#include "display/display_layout.h"
 #include "sensor.h"
-#include "interact.h"
 #include "utilities.h"
 #include <vector>
 #include <memory>
@@ -21,7 +20,7 @@ public:
 	bool stopBackgroundJob();
 
 	inline DisplayLayout* getActiveDisplayLayout() { return _dLayouts[_dLayoutActiveKey].get(); }
-	void activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransitionStyle style = DLTransitionStyle::AUTO);
+	void activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransitionStyle style = DLTransitionStyle::AUTO, bool force = false);
 	
 	inline bool isModeBackground() const { return _mode == Mode::BACKGROUND; }
 	inline bool isModeBackgroundInterrupted() const { return _mode == Mode::BACKGROUND_INTERRUPTED; }

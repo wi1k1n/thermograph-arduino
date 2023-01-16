@@ -9,16 +9,17 @@
 #define SSD1306_NO_SPLASH
 
 #define THERMOGRAPH_VERSION_MAJOR 2
-#define THERMOGRAPH_VERSION_MINOR 0
+#define THERMOGRAPH_VERSION_MINOR 1
 
 static const uint16_t MODE_DETECTION_DELAY = 250; // ms
 
-static const int8_t DISPLAY_PIN_RESET = -1;
 
 static const uint16_t DISPLAY_LAYOUT_LOGO_DELAY = 1000; // ms
 // static const uint8_t DISPLAY_LAYOUT_PADDING_TOP = 16;
 static const uint16_t DISPLAY_LAYOUT_MAIN_MEASUREMENT_PERIOD = 1000; // ms
 
+static const uint8_t DISPLAY_PIN_RESET = 0;
+static const uint8_t DISPLAY_ADDRESS = 0x3C;
 static const uint8_t INTERACT_PUSHBUTTON_1_PIN = 14; //D5 0; // D3
 static const uint8_t INTERACT_PUSHBUTTON_2_PIN = 12; //D6 2; // D4
 

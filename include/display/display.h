@@ -34,7 +34,7 @@ public:
 
 	Display() = default;
 	~Display();
-	bool init(TwoWire* wire, uint8_t rst, uint8_t addr);
+	bool init();
 	void disable();
 	void tick();
 
