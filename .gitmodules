@@ -1,0 +1,3 @@
+[submodule "submodules/lfsexplorer"]
+	path = submodules/lfsexplorer
+	url = https://github.com/wi1k1n/lfsexplorer
