@@ -26,15 +26,18 @@ static const uint8_t INTERACT_PUSHBUTTON_2_PIN = 12; //D6 2; // D4
 static const char STORAGEKEY_CONFIG[] = "/config";
 static const char STORAGEKEY_ISSLEEPING[] = "/issleeping";
 
+// The order in this enum must follow the order of inserting objects in Application class
+// Main menu layouts should go consequently for DLTransitionStyle::AUTO to function properly
 enum DisplayLayoutKeys {
 	NONE = -1,
 	WELCOME = 0,
 	BACKGROUND_INTERRUPTED,
+	GRAPH,
 	// Menu layouts
 	MAIN,
-	GRAPH,
+	MEASVIEWER,
 	SETTINGS,
-
+	//
 	_COUNT
 };
 enum class DLTransitionStyle {

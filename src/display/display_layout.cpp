@@ -1,12 +1,11 @@
 #include "display/display_layout.h"
 #include "main.h"
 
-bool DLGUI::init(Display* display, bool visible, bool focused) {
+bool DLGUI::init(Display* display, bool visible) {
     if (!display)
         return false;
     _display = display;
     setVisible(visible);
-    setFocused(focused);
     return true;
 }
 
@@ -21,17 +20,10 @@ void DLGUI::setVisible(bool visible, bool reDraw, bool doDisplay) {
 	}
 }
 
-void DLGUI::setFocused(bool focused, bool reDraw, bool doDisplay) {
-	_focused = focused;
-	if (reDraw) {
-		draw(doDisplay);
-	}
-}
-
 ///////////////////////////////
 
-bool DLButton::init(Display* display, UPoint pos, UPoint size, const String& title, bool visible, bool focused) {
-    if (!DLGUI::init(display, visible, focused))
+bool DLButton::init(Display* display, UPoint pos, UPoint size, const String& title, bool visible, bool focused, bool pressed) {
+    if (!DLGUI::init(display, visible) || !DLGUIFocusable::init(focused) || !DLGUIPressable::init(pressed))
         return false;
     _pos = pos;
     _size = size;
@@ -57,13 +49,13 @@ void DLButton::draw(bool doDisplay, bool clearFirst) {
     }
 
 	// DLOGLN();
-	uint8_t clrBG = _focused ? DISPLAY_WHITE : DISPLAY_BLACK;
-	uint8_t clrFG = _focused ? DISPLAY_BLACK : DISPLAY_WHITE;
+	uint8_t clrBG = isPressed() ? DISPLAY_WHITE : DISPLAY_BLACK;
+	uint8_t clrFG = isPressed() ? DISPLAY_BLACK : DISPLAY_WHITE;
 
-	if (clearFirst && !_focused) {
+	if (clearFirst && !isPressed()) {
 		clear(false);
 	}
-    if (_focused) {
+    if (isPressed()) {
 	    display()->fillRect(_pos.x, _pos.y, _size.x, _size.y, clrBG);
 	} else {
     	display()->drawRect(_pos.x, _pos.y, _size.x, _size.y, clrFG);
@@ -83,6 +75,19 @@ void DLButton::clear(bool doDisplay) {
 	display()->fillRect(_pos.x, _pos.y, _size.x, _size.y, DISPLAY_BLACK);
 	if (doDisplay) {
 		display()->display();
+	}
+}
+
+void DLButton::setFocused(bool focused, bool reDraw, bool doDisplay) {
+	DLGUIFocusable::setFocused(focused);
+	if (reDraw) {
+		draw(doDisplay);
+	}
+}
+void DLButton::setPressed(bool pressed, bool reDraw, bool doDisplay) {
+	DLGUIPressable::setPressed(pressed);
+	if (reDraw) {
+		draw(doDisplay);
 	}
 }
 

@@ -4,6 +4,7 @@
 #include "main.h"
 #include "LittleFS.h"
 
+/// @brief Set of helping wrapping funcs for the LittleFS class
 class ThFS {
 public:
 	static bool init();
@@ -27,8 +28,7 @@ public:
 	static bool writeStruct(File& f, T& s);
 };
 
-/// //////////////////////////////
-
+/// @brief Baseclass for any structures that are stored in filesystem
 struct StorageStruct {
 	uint8_t versionMajor;
 	uint8_t versionMinor;
@@ -36,6 +36,7 @@ struct StorageStruct {
 	StorageStruct() : versionMajor(THERMOGRAPH_VERSION_MAJOR), versionMinor(THERMOGRAPH_VERSION_MINOR) { }
 	StorageStruct(const StorageStruct&) = default;
 };
+/// @brief SStruct that contains info to be read after rebot in background task mode
 struct SStrSleeping : StorageStruct {
 	size_t timeAwake = 0;
 	Application::Mode mode = Application::Mode::INTERACT;
@@ -43,11 +44,13 @@ struct SStrSleeping : StorageStruct {
 	SStrSleeping() = default;
 	SStrSleeping(const SStrSleeping&) = default;
 };
+/// @brief SStruct that keeps configuration parameters for the device itself
 struct SStrConfig : StorageStruct {
 	SStrConfig() = default;
 	SStrConfig(const SStrConfig&) = default;
 };
 
+/// @brief A useful class that consolidates different SStructs and provides and interface to work with them
 class Storage {
 	static bool retreiveSleeping();
 	static bool retreiveConfig(bool createNew = false);

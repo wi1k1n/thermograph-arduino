@@ -80,7 +80,7 @@ void DLayoutMain::tick() {
 		// LOGLN("!2state");
 		if (_app->isModeInteract()) {
 			// LOGLN("Mode I");
-			if (_gBtnStart.isFocused()) {
+			if (_gBtnStart.isPressed()) {
 				// LOGLN("gbtnStart focused");
 				if (_btn1->release()) {
 					// LOGLN("1release -> change mode BI");
@@ -97,7 +97,7 @@ void DLayoutMain::tick() {
 				}
 				if (_btn1->held()) {
 					// LOGLN("1held -> gbtnStart set focused");
-					_gBtnStart.setFocused(true, true, true);
+					_gBtnStart.setPressed(true, true, true);
 				}
 			}
 		} else if (_app->isModeBackgroundInterrupted()) {
@@ -115,7 +115,7 @@ void DLayoutMain::tick() {
 			// LOGLN("Mode I");
 			if (_btn2->click()) {
 				// LOGLN(F("2click -> change menu to Graph"));
-				_app->activateDisplayLayout(DisplayLayoutKeys::GRAPH);
+				_app->activateDisplayLayout(DisplayLayoutKeys::MEASVIEWER);
 			}
 		} else if (_app->isModeBackgroundInterrupted()) {
 			// LOGLN("Mode BI");

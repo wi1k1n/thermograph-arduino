@@ -53,7 +53,10 @@ private:
 
 	size_t _timeAwake = 0; // how much time
 
+	bool initDisplayStuff();
+
 	void showDisplayError();
+	bool debugInitLFSExplorer();
 };
 
 #endif // MAIN_H__

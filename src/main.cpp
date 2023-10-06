@@ -4,10 +4,90 @@
 #include "lfsexplorer.h"
 #endif
 #include "display/dlayouts/dl_bginterrupted.h"
+#include "display/dlayouts/dl_measviewer.h"
 #include "display/dlayouts/dl_graph.h"
 #include "display/dlayouts/dl_main.h"
 #include "display/dlayouts/dl_settings.h"
 #include "display/dlayouts/dl_welcome.h"
+
+bool Application::setup() {
+	// TODO: Serial is only for debugging purposes for now
+#ifdef TDEBUG
+	_UART_.begin(115200); delay(1); _UART_.println();
+#endif
+	DLOGLN(F("Welcome to Thermograph v2"));
+
+	if (!ThFS::init())
+		return false;
+	DLOGLN(F("ThFS initialized"));
+
+	if (!_btn1.init(INTERACT_PUSHBUTTON_1_PIN) || !_btn2.init(INTERACT_PUSHBUTTON_2_PIN))
+		return false;
+	DLOGLN(F("Buttons initialized"));
+
+#ifdef TDEBUG // Hold btn2 to load Serial LittleFS explorer code
+	if (debugInitLFSExplorer())
+		return true;
+#endif
+
+	if (!Storage::init())
+		return false;
+	DLOGLN(F("Storage manager initialized"));
+	
+	// If not sleeping -> INTERACT mode
+	const SStrSleeping& sleepingEntry = Storage::getSleeping(true);
+	bool isSleeping = sleepingEntry.timeAwake > 0;
+	if (!isSleeping) {
+		_mode = Mode::INTERACT;
+#ifdef TDEBUG // Hold btn1 to force app to load in BI mode
+		delay(MODE_DETECTION_DELAY);
+		if (_btn1.tick() && !_btn2.tick()) {
+			DLOGLN(F("[DEBUG] FORCED TO ENTER BACKGROUND_INTERRUPTED MODE!"));
+			setModeBackgroundInterrupted();
+		}
+#endif
+	} else {
+		DLOG(F("isSleeping == true: timeAwake = "));
+		LOGLN(sleepingEntry.timeAwake);
+		// Decide what mode are we loading in
+		delay(MODE_DETECTION_DELAY);
+		if (_btn1.tick() && _btn2.tick()) {
+			DLOG(F("Button1 and Button2: pressed"));
+			setModeBackgroundInterrupted();
+		}
+	}
+	DLOG(F("Mode: "));
+	LOGLN(_mode);
+
+	if (isInteractionAvailable())
+		if (!initDisplayStuff())
+			return false;
+
+	if (!_sensorTemp.init())
+		return false;
+	DLOGLN(F("Sensor temp initialized"));
+	
+	if (isModeInteract()) {
+		activateDisplayLayout(DisplayLayoutKeys::WELCOME, DLTransitionStyle::NONE);
+	} else if (isModeBackgroundInterrupted()) {
+		activateDisplayLayout(DisplayLayoutKeys::MAIN, DLTransitionStyle::NONE);
+		// activateDisplayLayout(DisplayLayoutKeys::BACKGROUND_INTERRUPTED, DLTransitionStyle::NONE); // TODO: remove this display layout at all!
+	}
+
+	return true;
+}
+
+void Application::loop() {
+#ifdef TDEBUG
+	if (_mode == Mode::_DEBUG_LITTLEFS_EXPLORER)
+		return DEBUG::LittleFSExplorer("");
+#endif
+	_display.tick(); // out of the interact mode scope because of display error led timer
+	if (isInteractionAvailable()) {
+		_dltransMain.tick();
+		getActiveDisplayLayout()->tick();
+	}
+}
 
 void Application::makeMeasurement() {
 	// TODO: refactor in a proper way
@@ -44,126 +124,6 @@ bool Application::stopBackgroundJob() {
 	return Storage::removeSleeping();
 }
 
-bool Application::setup() {
-	// TODO: Serial is only for debugging purposes for now
-	#ifdef TDEBUG
-		_UART_.begin(115200);
-		delay(1);
-		_UART_.println();
-	#endif
-	DLOGLN(F("Welcome to Thermograph v2"));
-
-	if (!ThFS::init())
-		return false;
-	DLOGLN(F("ThFS initialized"));
-
-	if (!_btn1.init(INTERACT_PUSHBUTTON_1_PIN))
-		return false;
-	if (!_btn2.init(INTERACT_PUSHBUTTON_2_PIN))
-		return false;
-	DLOGLN(F("Buttons initialized"));
-
-#ifdef TDEBUG // Hold btn2 to load Serial LittleFS explorer code
-	delay(MODE_DETECTION_DELAY);
-	if (!_btn1.tick() && _btn2.tick()) {
-		DLOGLN(F("[DEBUG] LittleFS explorer mode! Run 'help' to check available commands."));
-		_mode = Mode::_DEBUG_LITTLEFS_EXPLORER;
-		if (_display.init()) {
-			delay(1);
-			_display->clearDisplay();
-			_display->setTextColor(DISPLAY_WHITE);
-			_display->setCursor(0, 0);
-			_display->setTextSize(1);
-			_display->print(F("LFSexplorer mode"));
-			_display->display();
-		}
-		return true;
-	}
-#endif
-
-	if (!Storage::init()) {
-		return false;
-	}
-	DLOGLN(F("Storage manager initialized"));
-	
-	// If not sleeping -> INTERACT mode
-	const SStrSleeping& sleepingEntry = Storage::getSleeping(true);
-	bool isSleeping = sleepingEntry.timeAwake > 0;
-	if (!isSleeping) {
-		_mode = Mode::INTERACT;
-#ifdef TDEBUG // Hold btn1 to force app to load in BI mode
-		delay(MODE_DETECTION_DELAY);
-		if (_btn1.tick() && !_btn2.tick()) {
-			DLOGLN(F("[DEBUG] FORCED TO ENTER BACKGROUND_INTERRUPTED MODE!"));
-			setModeBackgroundInterrupted();
-		}
-#endif
-	} else {
-		DLOG(F("isSleeping == true: timeAwake = "));
-		LOGLN(sleepingEntry.timeAwake);
-		// Decide what mode are we loading in
-		delay(MODE_DETECTION_DELAY);
-		if (_btn1.tick() && _btn2.tick()) {
-			DLOG(F("Button1 and Button2: pressed"));
-			setModeBackgroundInterrupted();
-		}
-	}
-	DLOG(F("Mode: "));
-	LOGLN(_mode);
-
-	if (isInteractionAvailable()) {
-		// Init display at first place as this is must have in user interaction mode
-		if (!_display.init())
-			return false;
-		DLOGLN(F("Display initialized"));
-		_display->clearDisplay();
-		
-		// Order should follow the order in DisplayLayouts
-		for (uint8_t i = 0; i < DisplayLayoutKeys::_COUNT; ++i) _dLayouts.push_back(nullptr);
-		_dLayouts[DisplayLayoutKeys::WELCOME].reset(new DLayoutWelcome);
-		_dLayouts[DisplayLayoutKeys::BACKGROUND_INTERRUPTED].reset(new DLayoutBackgroundInterrupted);
-		// // Menu layouts
-		_dLayouts[DisplayLayoutKeys::MAIN].reset(new DLayoutMain);
-		_dLayouts[DisplayLayoutKeys::GRAPH].reset(new DLayoutGraph);
-		_dLayouts[DisplayLayoutKeys::SETTINGS].reset(new DLayoutSettings);
-
-		for (auto& dlayout : _dLayouts) {
-			if (!dlayout->init(&_display, this, &_btn1, &_btn2))
-				return false;
-		}
-		DLOGLN(F("Display layouts initialized"));
-
-		if (!_dltransMain.init(&_display, 200, DLTransition::Interpolation::APOW3))
-			return false;
-		DLOGLN(F("Display transition initialized"));
-	}
-
-	if (!_sensorTemp.init())
-		return false;
-	DLOGLN(F("Sensor temp initialized"));
-	
-	if (isModeInteract()) {
-		activateDisplayLayout(DisplayLayoutKeys::WELCOME, DLTransitionStyle::NONE);
-	} else if (isModeBackgroundInterrupted()) {
-		activateDisplayLayout(DisplayLayoutKeys::MAIN, DLTransitionStyle::NONE);
-		// activateDisplayLayout(DisplayLayoutKeys::BACKGROUND_INTERRUPTED, DLTransitionStyle::NONE); // TODO: remove this display layout at all!
-	}
-
-	return true;
-}
-
-void Application::loop() {
-#ifdef TDEBUG
-	if (_mode == Mode::_DEBUG_LITTLEFS_EXPLORER)
-		return DEBUG::LittleFSExplorer("");
-#endif
-	_display.tick(); // out of the interact mode scope because of display error led timer
-	if (isInteractionAvailable()) {
-		_dltransMain.tick();
-		getActiveDisplayLayout()->tick();
-	}
-}
-
 void Application::activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransitionStyle style, bool force) {
 	if (!isInteractionAvailable() || dLayoutKey == DisplayLayoutKeys::NONE || (dLayoutKey == _dLayoutActiveKey && !force)) {
 		return;
@@ -192,6 +152,54 @@ void Application::activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransiti
 	// Some flags can persist from previous layouts control handling, reset them
 	_btn1.reset();
 	_btn2.reset();
+}
+
+bool Application::initDisplayStuff() {
+	// Init display at first place as this is must have in user interaction mode
+	if (!_display.init())
+		return false;
+	DLOGLN(F("Display initialized"));
+	_display->clearDisplay();
+	
+	// Order should follow the order in DisplayLayouts
+	for (uint8_t i = 0; i < DisplayLayoutKeys::_COUNT; ++i) _dLayouts.push_back(nullptr);
+	_dLayouts[DisplayLayoutKeys::WELCOME].reset(new DLayoutWelcome);
+	_dLayouts[DisplayLayoutKeys::BACKGROUND_INTERRUPTED].reset(new DLayoutBackgroundInterrupted);
+	_dLayouts[DisplayLayoutKeys::GRAPH].reset(new DLayoutGraph);
+	// Main menu carousel layouts
+	_dLayouts[DisplayLayoutKeys::MAIN].reset(new DLayoutMain);
+	_dLayouts[DisplayLayoutKeys::MEASVIEWER].reset(new DLayoutMeasViewer);
+	_dLayouts[DisplayLayoutKeys::SETTINGS].reset(new DLayoutSettings);
+
+	for (auto& dlayout : _dLayouts)
+		if (!dlayout->init(&_display, this, &_btn1, &_btn2))
+			return false;
+	DLOGLN(F("Display layouts initialized"));
+
+	if (!_dltransMain.init(&_display, 200, DLTransition::Interpolation::APOW3))
+		return false;
+	DLOGLN(F("Display transition initialized"));
+
+	return true;
+}
+
+bool Application::debugInitLFSExplorer() {
+	delay(MODE_DETECTION_DELAY);
+	if (!_btn1.tick() && _btn2.tick()) {
+		DLOGLN(F("[DEBUG] LittleFS explorer mode! Run 'help' to check available commands."));
+		_mode = Mode::_DEBUG_LITTLEFS_EXPLORER;
+		if (_display.init()) {
+			delay(1);
+			_display->clearDisplay();
+			_display->setTextColor(DISPLAY_WHITE);
+			_display->setCursor(0, 0);
+			_display->setTextSize(1);
+			_display->print(F("LFSexplorer mode"));
+			_display->display();
+		}
+		return true;
+	}
+	return false;
 }
 
 /////////////////////////
