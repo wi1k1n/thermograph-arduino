@@ -4,7 +4,7 @@
 #include "main.h"
 #include "LittleFS.h"
 
-/// @brief Set of helping wrapping funcs for the LittleFS class
+/// @brief Thermograph File System: A set of helping wrapping funcs for the LittleFS class
 class ThFS {
 public:
 	static bool init();

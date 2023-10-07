@@ -1,8 +1,8 @@
 #include "display/dlayouts/dl_welcome.h"
 #include "logo.h"
 
-bool DLayoutWelcome::init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) {
-	bool success = DisplayLayout::init(display, app, btn1, btn2);
+bool DLayoutWelcome::init(Display* display, Application* app, HardwareInputs* inputs) {
+	bool success = DisplayLayout::init(display, app, inputs);
 	return success && _timer.init(DISPLAY_LAYOUT_LOGO_DELAY, Timer::MODE::TIMER);
 }
 void DLayoutWelcome::update(void* data) {

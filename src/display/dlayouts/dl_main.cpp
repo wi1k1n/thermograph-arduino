@@ -25,8 +25,8 @@ void DLayoutMain::adjustGButtonsModeBGInterrupted() {
 	_gBtnStop.setVisible(true);
 }
 
-bool DLayoutMain::init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) {
-	const bool success = DisplayLayout::init(display, app, btn1, btn2);
+bool DLayoutMain::init(Display* display, Application* app, HardwareInputs* inputs) {
+	const bool success = DisplayLayout::init(display, app, inputs);
 	_debugLED.init(LED_BUILTIN);
     const uint8_t bWidth = 42;
     const uint8_t bHeight = 16;
@@ -67,22 +67,27 @@ void DLayoutMain::tick() {
 	if (_timerMeasure.tick()) {
 		_app->makeMeasurement();
 	}
+	
+	PushButton* btn1 = static_cast<PushButton*>(_inputs->getInput(HardwareInputs::HardwareInputChannel::BUTTON1));
+	PushButton* btn2 = static_cast<PushButton*>(_inputs->getInput(HardwareInputs::HardwareInputChannel::BUTTON2));
+	if (!btn1 || !btn2)
+		return;
 
 	// Don't waste time if no user control to process
-	if (!_btn1->tick() && !_btn2->tick()) {
+	if (!btn1->tick() && !btn2->tick()) {
 		// _debugLED.off();
 		return;
 	}
 	// _debugLED.on();
 	
 	// Only if btn2 is NOT pressed
-	if (!_btn2->down()) {
+	if (!btn2->down()) {
 		// LOGLN("!2state");
 		if (_app->isModeInteract()) {
 			// LOGLN("Mode I");
 			if (_gBtnStart.isPressed()) {
 				// LOGLN("gbtnStart focused");
-				if (_btn1->release()) {
+				if (btn1->release()) {
 					// LOGLN("1release -> change mode BI");
 					// _app->setModeBackgroundInterrupted();
 					// activate(); // TODO: turn off directly
@@ -91,35 +96,35 @@ void DLayoutMain::tick() {
 				}
 			} else {
 				// LOGLN("gbtnStart !focused");
-				if (_btn1->click()) {
+				if (btn1->click()) {
 					// LOGLN(F("1click -> change menu to Settings"));
 					_app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
 				}
-				if (_btn1->held()) {
+				if (btn1->held()) {
 					// LOGLN("1held -> gbtnStart set focused");
 					_gBtnStart.setPressed(true, true, true);
 				}
 			}
 		} else if (_app->isModeBackgroundInterrupted()) {
 			// LOGLN("Mode BI");
-			if (_btn1->click()) {
+			if (btn1->click()) {
 				// LOGLN(F("1click -> change menu to Settings"));
 				_app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
 			}
 		}
 	}
 	// Only if btn1 NOT pressed
-	if (!_btn1->down()) {
+	if (!btn1->down()) {
 		// LOGLN("!1state");
 		if (_app->isModeInteract()) {
 			// LOGLN("Mode I");
-			if (_btn2->click()) {
+			if (btn2->click()) {
 				// LOGLN(F("2click -> change menu to Graph"));
 				_app->activateDisplayLayout(DisplayLayoutKeys::MEASVIEWER);
 			}
 		} else if (_app->isModeBackgroundInterrupted()) {
 			// LOGLN("Mode BI");
-			if (_btn2->click()) {
+			if (btn2->click()) {
 				// LOGLN(F("2click -> change mode to I"));
 				// _app->setModeInteract();
 				// activate(); // TODO: turn off directly

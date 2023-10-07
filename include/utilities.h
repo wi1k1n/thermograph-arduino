@@ -34,6 +34,45 @@ public:
 	}
 };
 
+/// @brief Helping class for easing managing hardware inputs (button pushes)
+class HardwareInputs {
+public:
+	enum class HardwareInputChannel {
+		BUTTON1, // <PushButton> - init_data: uint8_t pin
+		BUTTON2  // <PushButton> - init_data: uint8_t pin
+	};
+
+	HardwareInputs() = default;
+	bool init(const HardwareInputChannel& channel, const void* data) {
+		if (channel == HardwareInputChannel::BUTTON1) {
+			uint8_t pin = *static_cast<const uint8_t*>(data);
+			return _btn1.init(pin);
+		}
+		if (channel == HardwareInputChannel::BUTTON2) {
+			uint8_t pin = *static_cast<const uint8_t*>(data);
+			return _btn2.init(pin);
+		}
+		return false;
+	}
+	bool tick(const HardwareInputChannel& channel) {
+		if (channel == HardwareInputChannel::BUTTON1)
+			return _btn1.tick();
+		if (channel == HardwareInputChannel::BUTTON2)
+			return _btn2.tick();
+		return false;
+	}
+	void* getInput(const HardwareInputChannel& channel) {
+		if (channel == HardwareInputChannel::BUTTON1)
+			return static_cast<void*>(&_btn1);
+		if (channel == HardwareInputChannel::BUTTON2)
+			return static_cast<void*>(&_btn2);
+		return nullptr;
+	}
+private:
+	PushButton _btn1;
+	PushButton _btn2;
+};
+
 class Timer : public TimerMs {
 public:
 	enum MODE {

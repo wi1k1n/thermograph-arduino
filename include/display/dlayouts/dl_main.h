@@ -19,7 +19,7 @@ class DLayoutMain : public DisplayLayout {
 	void adjustGButtonsModeInteract();
 	void adjustGButtonsModeBGInterrupted();
 public:
-	bool init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) override;
+	bool init(Display* display, Application* app, HardwareInputs* inputs) override;
 	void activate() override;
 	void deactivate() override;
 	void draw(bool doDisplay = true) override;

@@ -7,7 +7,7 @@ class DLayoutSettings : public DisplayLayout {
 	float _temp1;
 	Timer _timerRandomPixel;
 public:
-	bool init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) override;
+	bool init(Display* display, Application* app, HardwareInputs* inputs) override;
 	void draw(bool doDisplay = true) override;
 	void activate() override;
 	void deactivate() override;

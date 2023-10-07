@@ -68,15 +68,14 @@ class DisplayLayout {
 protected:
 	Display* _display = nullptr;
 	Application* _app = nullptr;
-	PushButton* _btn1 = nullptr;
-	PushButton* _btn2 = nullptr;
+	HardwareInputs* _inputs = nullptr;
 	inline Display& display() { return *_display; }
 public:
 	DisplayLayout() = default;
-	virtual bool init(Display* display, Application* app, PushButton* btn1, PushButton* btn2);
+	virtual bool init(Display* display, Application* app, HardwareInputs* inputs);
 	virtual void activate() { draw(); } // should be called when layout is entered
 	virtual void deactivate() { }
-	virtual void draw(bool doDisplay = true) { }
+	virtual void draw(bool doDisplay = true) { } // doDisplay forces _display->display() in the end of the function
 	virtual void update(void* data) { }
 	virtual void tick() { }
 };

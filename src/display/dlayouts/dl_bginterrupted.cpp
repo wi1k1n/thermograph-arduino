@@ -1,7 +1,7 @@
 #include "display/dlayouts/dl_bginterrupted.h"
 
-bool DLayoutBackgroundInterrupted::init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) {
-	bool success = DisplayLayout::init(display, app, btn1, btn2);
+bool DLayoutBackgroundInterrupted::init(Display* display, Application* app, HardwareInputs* inputs) {
+	bool success = DisplayLayout::init(display, app, inputs);
 	return success && _gBtn.init(display, {32, 32}, {42, 16}, "Pushme");
 }
 void DLayoutBackgroundInterrupted::draw(bool doDisplay) {

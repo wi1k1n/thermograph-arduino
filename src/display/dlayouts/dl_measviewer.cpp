@@ -1,8 +1,8 @@
 #include "display/dlayouts/dl_measviewer.h"
 #include "main.h"
 
-bool DLayoutMeasViewer::init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) {
-	bool success = DisplayLayout::init(display, app, btn1, btn2);
+bool DLayoutMeasViewer::init(Display* display, Application* app, HardwareInputs* inputs) {
+	bool success = DisplayLayout::init(display, app, inputs);
 	return success && _timerRandomPixel.init(120, Timer::MODE::PERIOD);
 }
 void DLayoutMeasViewer::update(void* data) {
@@ -25,15 +25,20 @@ void DLayoutMeasViewer::tick() {
 		display()->drawPixel(x, y, clr);
 		display()->display();
 	}
+	
+	PushButton* btn1 = static_cast<PushButton*>(_inputs->getInput(HardwareInputs::HardwareInputChannel::BUTTON1));
+	PushButton* btn2 = static_cast<PushButton*>(_inputs->getInput(HardwareInputs::HardwareInputChannel::BUTTON2));
+	if (!btn1 || !btn2)
+		return;
 
-	if (!_btn1->tick() && !_btn2->tick()) {
+	if (!btn1->tick() && !btn2->tick()) {
 		return;
 	}
-	if (!_btn2->down() && _btn1->click()) {
+	if (!btn2->down() && btn1->click()) {
 		_app->activateDisplayLayout(DisplayLayoutKeys::MAIN);
 		return;
 	}
-	if (!_btn1->down() && _btn2->click()) {
+	if (!btn1->down() && btn2->click()) {
 		_app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
 		return;
 	}

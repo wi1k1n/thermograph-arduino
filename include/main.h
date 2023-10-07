@@ -47,8 +47,7 @@ private:
 	std::vector<std::unique_ptr<DisplayLayout>> _dLayouts;
 	DisplayLayoutKeys _dLayoutActiveKey = DisplayLayoutKeys::NONE;
 
-	PushButton _btn1;
-	PushButton _btn2;
+	HardwareInputs _inputs;
 	TempSensor _sensorTemp;
 
 	size_t _timeAwake = 0; // how much time

@@ -93,12 +93,11 @@ void DLButton::setPressed(bool pressed, bool reDraw, bool doDisplay) {
 
 /////////////////////////////////
 
-bool DisplayLayout::init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) {
-	if (!display || !app || !btn1 || !btn2)
+bool DisplayLayout::init(Display* display, Application* app, HardwareInputs* inputs) {
+	if (!display || !app || !inputs)
 		return false;
 	_display = display;
 	_app = app;
-	_btn1 = btn1;
-	_btn2 = btn2;
+	_inputs = inputs;
 	return true;
 }

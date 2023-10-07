@@ -4,9 +4,9 @@
 #include "display/display_layout.h"
 
 class DLayoutBackgroundInterrupted : public DisplayLayout {
-    DLButton _gBtn;
+	DLButton _gBtn;
 public:
-	bool init(Display* display, Application* app, PushButton* btn1, PushButton* btn2) override;
+	bool init(Display* display, Application* app, HardwareInputs* inputs) override;
 	void draw(bool doDisplay = true) override;
 	void tick() override;
 };

@@ -6,15 +6,21 @@ void DLayoutGraph::update(void* data) {
 }
 void DLayoutGraph::tick() {
 	DisplayLayout::tick();
-	if (!_btn1->tick() && !_btn2->tick()) {
+	
+	PushButton* btn1 = static_cast<PushButton*>(_inputs->getInput(HardwareInputs::HardwareInputChannel::BUTTON1));
+	PushButton* btn2 = static_cast<PushButton*>(_inputs->getInput(HardwareInputs::HardwareInputChannel::BUTTON2));
+	if (!btn1 || !btn2)
+		return;
+
+	if (!btn1->tick() && !btn2->tick()) {
 		return;
 	}
 
-	if (!_btn2->down() && _btn1->click()) {
+	if (!btn2->down() && btn1->click()) {
 		_app->activateDisplayLayout(DisplayLayoutKeys::MAIN);
 		return;
 	}
-	if (!_btn1->down() && _btn2->click()) {
+	if (!btn1->down() && btn2->click()) {
 		_app->activateDisplayLayout(DisplayLayoutKeys::SETTINGS);
 		return;
 	}

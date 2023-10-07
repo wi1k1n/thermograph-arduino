@@ -10,20 +10,25 @@
 #include "display/dlayouts/dl_settings.h"
 #include "display/dlayouts/dl_welcome.h"
 
+using HIChannel = HardwareInputs::HardwareInputChannel;
+
 bool Application::setup() {
-	// TODO: Serial is only for debugging purposes for now
-#ifdef TDEBUG
-	_UART_.begin(115200); delay(1); _UART_.println();
-#endif
+	_UART_.begin(115200);
 	DLOGLN(F("Welcome to Thermograph v2"));
 
 	if (!ThFS::init())
 		return false;
 	DLOGLN(F("ThFS initialized"));
 
-	if (!_btn1.init(INTERACT_PUSHBUTTON_1_PIN) || !_btn2.init(INTERACT_PUSHBUTTON_2_PIN))
-		return false;
-	DLOGLN(F("Buttons initialized"));
+	{
+		uint8_t btnPin = INTERACT_PUSHBUTTON_1_PIN;
+		if (!_inputs.init(HIChannel::BUTTON1, &btnPin))
+			return false;
+		btnPin = INTERACT_PUSHBUTTON_2_PIN;
+		if (!_inputs.init(HIChannel::BUTTON2, &btnPin))
+			return false;
+		DLOGLN(F("Buttons initialized"));
+	}
 
 #ifdef TDEBUG // Hold btn2 to load Serial LittleFS explorer code
 	if (debugInitLFSExplorer())
@@ -41,7 +46,7 @@ bool Application::setup() {
 		_mode = Mode::INTERACT;
 #ifdef TDEBUG // Hold btn1 to force app to load in BI mode
 		delay(MODE_DETECTION_DELAY);
-		if (_btn1.tick() && !_btn2.tick()) {
+		if (_inputs.tick(HIChannel::BUTTON1) && !_inputs.tick(HIChannel::BUTTON2)) {
 			DLOGLN(F("[DEBUG] FORCED TO ENTER BACKGROUND_INTERRUPTED MODE!"));
 			setModeBackgroundInterrupted();
 		}
@@ -51,7 +56,7 @@ bool Application::setup() {
 		LOGLN(sleepingEntry.timeAwake);
 		// Decide what mode are we loading in
 		delay(MODE_DETECTION_DELAY);
-		if (_btn1.tick() && _btn2.tick()) {
+		if (_inputs.tick(HIChannel::BUTTON1) && _inputs.tick(HIChannel::BUTTON2)) {
 			DLOG(F("Button1 and Button2: pressed"));
 			setModeBackgroundInterrupted();
 		}
@@ -149,20 +154,25 @@ void Application::activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransiti
 		_dltransMain.start(getActiveDisplayLayout(), target, direction);
 	}
 	_dLayoutActiveKey = dLayoutKey;
+	
 	// Some flags can persist from previous layouts control handling, reset them
-	_btn1.reset();
-	_btn2.reset();
+	// TODO: better design, please!
+	if (PushButton* btn = static_cast<PushButton*>(_inputs.getInput(HIChannel::BUTTON1)))
+		btn->reset();
+	if (PushButton* btn = static_cast<PushButton*>(_inputs.getInput(HIChannel::BUTTON2)))
+		btn->reset();
 }
 
 bool Application::initDisplayStuff() {
-	// Init display at first place as this is must have in user interaction mode
+	// Init display at first place as this is a must-have in the user interaction mode
 	if (!_display.init())
 		return false;
 	DLOGLN(F("Display initialized"));
 	_display->clearDisplay();
 	
 	// Order should follow the order in DisplayLayouts
-	for (uint8_t i = 0; i < DisplayLayoutKeys::_COUNT; ++i) _dLayouts.push_back(nullptr);
+	for (uint8_t i = 0; i < DisplayLayoutKeys::_COUNT; ++i)
+		_dLayouts.push_back(nullptr);
 	_dLayouts[DisplayLayoutKeys::WELCOME].reset(new DLayoutWelcome);
 	_dLayouts[DisplayLayoutKeys::BACKGROUND_INTERRUPTED].reset(new DLayoutBackgroundInterrupted);
 	_dLayouts[DisplayLayoutKeys::GRAPH].reset(new DLayoutGraph);
@@ -172,7 +182,7 @@ bool Application::initDisplayStuff() {
 	_dLayouts[DisplayLayoutKeys::SETTINGS].reset(new DLayoutSettings);
 
 	for (auto& dlayout : _dLayouts)
-		if (!dlayout->init(&_display, this, &_btn1, &_btn2))
+		if (!dlayout->init(&_display, this, &_inputs))
 			return false;
 	DLOGLN(F("Display layouts initialized"));
 
@@ -185,7 +195,7 @@ bool Application::initDisplayStuff() {
 
 bool Application::debugInitLFSExplorer() {
 	delay(MODE_DETECTION_DELAY);
-	if (!_btn1.tick() && _btn2.tick()) {
+	if (!_inputs.tick(HIChannel::BUTTON1) && _inputs.tick(HIChannel::BUTTON2)) {
 		DLOGLN(F("[DEBUG] LittleFS explorer mode! Run 'help' to check available commands."));
 		_mode = Mode::_DEBUG_LITTLEFS_EXPLORER;
 		if (_display.init()) {
