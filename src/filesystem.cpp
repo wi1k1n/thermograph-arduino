@@ -124,9 +124,16 @@ bool Storage::removeSleeping() {
 	return ThFS::remove(STORAGEKEY_ISSLEEPING);
 }
 
-const SStrConfig& Storage::getConfig(bool retrieve) {
+SStrConfig& Storage::getConfig(bool retrieve) {
 	if (retrieve) {
 		retreiveConfig();
 	}
 	return _config;
+}
+
+bool Storage::storeConfig() {
+	File f = ThFS::openW(STORAGEKEY_CONFIG);
+	if (!f)
+		return false;
+	return ThFS::writeStruct(f, _config);
 }

@@ -5,6 +5,32 @@ DLSpinButton& DLayoutSettings::getOption(const Options& option) {
 	return _options.at(static_cast<size_t>(option));
 }
 
+const String periodLabels[] = { "5s", "10s", "15s", "30s", "1m", "1m 30s", "2m", "3m", "4m", "5m", "10m", "15m", "20m", "30m", "1h", "1h 30m", "2h", "3h", "4h", "5h", "6h", "8h", "10h", "12h", "18h" };
+const uint16_t periodIntervals[] = { 5, 10, 15, 30, 60, 90, 120, 180, 240, 300, 600, 900, 1200, 1800, 3600, 5400, 7200, 10800, 14400, 18000, 21600, 28800, 36000, 43200, 64800 };
+
+static uint8_t getPeriodIdxByInterval(uint16_t interval) {
+	for (uint8_t i = 0; i < std::size(periodIntervals); ++i)
+		if (interval == periodIntervals[i])
+			return i;
+	return 255;
+}
+
+String DLayoutSettings::retrieveOptionTitle(const Options& option) {
+	ThSettings& settings = _app->getSettings();
+	if (option == Options::PERIOD) {
+		uint16_t period = settings.getEntry<uint16_t>(ThSettings::Entries::PERIOD);
+		uint8_t idx = getPeriodIdxByInterval(period);
+		if (idx == 255)
+			return "Error!";
+		return "Period: " + String(periodLabels[idx]);
+	}
+	if (option == Options::N_MEASUREMENTS) {
+		uint16_t nMeas = settings.getEntry<uint16_t>(ThSettings::Entries::N_MEASUREMENTS);
+		return nMeas == static_cast<uint16_t>(-1) ? "Unlimited" : String(nMeas);
+	}
+	return "Error!";
+}
+
 bool DLayoutSettings::init(Display* display, Application* app, HardwareInputs* inputs) {
 	bool success = DisplayLayout::init(display, app, inputs);
 
@@ -17,8 +43,8 @@ bool DLayoutSettings::init(Display* display, Application* app, HardwareInputs* i
 
 	_options.resize(static_cast<size_t>(Options::_OPTIONS_COUNT));
 
-	success &= getOption(Options::PERIOD).init(display, {(dWidth - bWidth) / 2, bY}, bSize, "Period: 5m", 1, 0, 0, 0, 0);
-	success &= getOption(Options::N_MEASUREMENTS).init(display, {(dWidth - bWidth) / 2, bY + bHeight + bPadding}, bSize, "N = 144", 1, 0, 0, 0, 0);
+	success &= getOption(Options::PERIOD).init(display, {(dWidth - bWidth) / 2, bY}, bSize, retrieveOptionTitle(Options::PERIOD), 1, 0, 0, 0, 0);
+	success &= getOption(Options::N_MEASUREMENTS).init(display, {(dWidth - bWidth) / 2, bY + bHeight + bPadding}, bSize, retrieveOptionTitle(Options::N_MEASUREMENTS), 1, 0, 0, 0, 0);
 
 	return success && _timerRandomPixel.init(120, Timer::MODE::PERIOD);
 }
@@ -122,6 +148,7 @@ void DLayoutSettings::tick() {
 		// 	selectOption((_selectedOptionIdx + 1) % _options.size());
 		// }
 		if (btn1->down() && btn2->down()) { // exit to option selection mode
+			_app->getSettings().storeConfig();
 			return changeMode(SettingsMode::OPTION_SELECTION);
 		}
 
@@ -149,11 +176,14 @@ void DLayoutSettings::tick() {
 		
 		if (action != OptionChangeAction::NONE) {
 			if (_selectedOptionIdx == static_cast<uint8_t>(Options::PERIOD)) {
-				const std::vector<String> labels = { "5s", "10s", "15s", "30s", "1m", "1m 30s", "2m", "3m", "4m", "5m", "10m", "15m", "20m", "30m", "1h", "1h 30m", "2h", "3h", "4h", "5h", "6h", "8h", "10h", "12h", "18h" };
-				const std::vector<uint16_t> intervals = { 5, 10, 15, 30, 60, 90, 120, 180, 240, 300, 600, 900, 1200, 1800, 3600, 5400, 7200, 10800, 14400, 18000, 21600, 28800, 36000, 43200, 64800 };
-				_periodIdx = ((_periodIdx + dir < 0 ? (labels.size() - 1) : (_periodIdx + dir))) % labels.size();
-				getOption(Options::PERIOD).setTitle("Period: " + labels.at(_periodIdx));
-				_app->getSettings().setEntry(ThSettings::Entries::PERIOD, intervals.at(_periodIdx));
+				uint8_t periodEntriesSize = std::size(periodIntervals);
+				uint16_t curInterval = _app->getSettings().getEntry<uint16_t>(ThSettings::Entries::PERIOD);
+				uint8_t curIdx = getPeriodIdxByInterval(curInterval);
+				uint8_t newIdx = ((curIdx + dir < 0 ? (periodEntriesSize - 1) : (curIdx + dir))) % periodEntriesSize;
+				
+				_app->getSettings().setEntry(ThSettings::Entries::PERIOD, periodIntervals[newIdx]);
+				getOption(Options::PERIOD).setTitle(retrieveOptionTitle(Options::PERIOD));
+
 				draw();
 			}
 			
@@ -178,10 +208,13 @@ void DLayoutSettings::tick() {
 				else if (newN > MAX_N)
 					newN = MAX_N;
 				const uint16_t finalN = static_cast<uint16_t>(newN);
-				DLOG("N="); LOG(N); LOG(" | newN="); LOG(newN); LOG(" | finalN="); LOGLN(finalN);
-				const String title = newN == -1 ? "Unlimited" : ("N = " + String(finalN));
-				getOption(Options::N_MEASUREMENTS).setTitle(title);
+				// DLOG("N="); LOG(N); LOG(" | newN="); LOG(newN); LOG(" | finalN="); LOGLN(finalN);
+				// const String title = newN == -1 ? "Unlimited" : ("N = " + String(finalN));
+				// getOption(Options::N_MEASUREMENTS).setTitle(title);
+
 				_app->getSettings().setEntry(ThSettings::Entries::N_MEASUREMENTS, finalN);
+				getOption(Options::N_MEASUREMENTS).setTitle(retrieveOptionTitle(Options::N_MEASUREMENTS));
+
 				draw();
 			}
 		}

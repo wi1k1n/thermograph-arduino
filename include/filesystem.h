@@ -48,6 +48,9 @@ struct SStrSleeping : StorageStruct {
 };
 /// @brief SStruct that keeps configuration parameters for the device itself
 struct SStrConfig : StorageStruct {
+	uint16_t period = 0;
+	uint16_t nMeasurements = 0;
+	
 	SStrConfig() = default;
 	SStrConfig(const SStrConfig&) = default;
 };
@@ -65,7 +68,8 @@ public:
 	static bool setSleeping(size_t timeAwake, Application::Mode mode);
 	static bool removeSleeping();
 
-	static const SStrConfig& getConfig(bool retrieve = false);
+	static SStrConfig& getConfig(bool retrieve = false);
+	static bool storeConfig();
 private:
 	static SStrConfig _config;
 	static SStrSleeping _sleeping;

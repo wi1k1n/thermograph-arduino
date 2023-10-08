@@ -35,6 +35,8 @@ public:
 	void tick() override;
 protected:
 	DLSpinButton& getOption(const Options& option);
+	String retrieveOptionTitle(const Options& option);
+
 	void changeMode(const SettingsMode& mode);
 	void selectOption(uint8_t idx);
 
@@ -46,8 +48,6 @@ private:
 	uint8_t _selectedOptionIdx = 0;
 
 	std::vector<DLSpinButton> _options;
-
-	uint8_t _periodIdx = 9;
 };
 
 #endif // DL_SETTINGS_H__

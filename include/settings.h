@@ -18,6 +18,10 @@ public:
 	const T& getEntry(const Entries& entry) const;
 	template<typename T>
 	bool setEntry(const Entries& entry, const T& val);
+	template<typename T>
+	T getEntryDefault(const Entries& entry) const;
+
+	bool storeConfig();
 private:
 	uint16_t _periodMeasurement = 600; // in seconds
 	uint16_t _numberOfMeasurements = 144;
