@@ -45,9 +45,9 @@ bool Application::setup() {
 		return false;
 	reportInitialized(3, "Storage manager initialized");
 
-	// if (!_settings.init())
-	// 	return false;
-	// reportInitialized(4, "Settings manager initialized");
+	if (!_settings.init())
+		return false;
+	reportInitialized(4, "Settings manager initialized");
 	
 	// If not sleeping -> INTERACT mode
 	const SStrSleeping& sleepingEntry = Storage::getSleeping(true);

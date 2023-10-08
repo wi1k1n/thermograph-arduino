@@ -31,6 +31,9 @@ public:
 
 	inline bool isInteractionAvailable() const { return isModeBackgroundInterrupted() || isModeInteract() ;}
 
+	inline const ThSettings& getSettings() const { return _settings; }
+	inline ThSettings& getSettings() { return _settings; }
+
 	enum Mode {
 		BACKGROUND = 0,				// autonomously woke up while working in background
 		BACKGROUND_INTERRUPTED,		// background job in progress but user interrupt

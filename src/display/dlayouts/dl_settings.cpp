@@ -17,8 +17,8 @@ bool DLayoutSettings::init(Display* display, Application* app, HardwareInputs* i
 
 	_options.resize(static_cast<size_t>(Options::_OPTIONS_COUNT));
 
-	success &= getOption(Options::PERIOD).init(display, {(dWidth - bWidth) / 2, bY}, bSize, "Period: 5s", 1, 0, 0, 0, 0);
-	success &= getOption(Options::N_MEASUREMENTS).init(display, {(dWidth - bWidth) / 2, bY + bHeight + bPadding}, bSize, "N = 12", 1, 0, 0, 0, 0);
+	success &= getOption(Options::PERIOD).init(display, {(dWidth - bWidth) / 2, bY}, bSize, "Period: 5m", 1, 0, 0, 0, 0);
+	success &= getOption(Options::N_MEASUREMENTS).init(display, {(dWidth - bWidth) / 2, bY + bHeight + bPadding}, bSize, "N = 144", 1, 0, 0, 0, 0);
 
 	return success && _timerRandomPixel.init(120, Timer::MODE::PERIOD);
 }
@@ -126,29 +126,62 @@ void DLayoutSettings::tick() {
 		}
 
 		OptionChangeAction action = OptionChangeAction::NONE;
+		uint16_t stepCounter = 0;
 		if (!btn1->down() && btn2->click())
 			action = OptionChangeAction::INCREMENT_SMALL;
 		else if (!btn2->down() && btn1->click())
 			action = OptionChangeAction::DECREMENT_SMALL;
-		else if (!btn1->down() && btn2->held())
-			action = OptionChangeAction::INCREMENT_BIG;
-		else if (!btn2->down() && btn1->held())
-			action = OptionChangeAction::DECREMENT_BIG;
+		else if (!btn1->down() && btn2->step()) {
+			action = OptionChangeAction::INCREMENT_STEP;
+			stepCounter = btn2->getStepCounter();
+		} else if (!btn2->down() && btn1->step()) {
+			action = OptionChangeAction::DECREMENT_STEP;
+			stepCounter = btn1->getStepCounter();
+		}
+
+		int8_t dir = 0;
+		if (action == OptionChangeAction::INCREMENT_SMALL
+			|| action == OptionChangeAction::INCREMENT_STEP)
+			dir = 1;
+		else if (action == OptionChangeAction::DECREMENT_SMALL
+				|| action == OptionChangeAction::DECREMENT_STEP)
+			dir = -1;
 		
 		if (action != OptionChangeAction::NONE) {
 			if (_selectedOptionIdx == static_cast<uint8_t>(Options::PERIOD)) {
-				const std::vector<String> labels = { "5s", "10s", "15s", "30s", "1m", "1m30s", "2m", "3m", "4m", "5m", "10m", "15m", "20m", "30m", "1h", "1h30m", "2h", "3h", "4h", "5h", "6h", "8h", "10h", "12h", "18h" };
+				const std::vector<String> labels = { "5s", "10s", "15s", "30s", "1m", "1m 30s", "2m", "3m", "4m", "5m", "10m", "15m", "20m", "30m", "1h", "1h 30m", "2h", "3h", "4h", "5h", "6h", "8h", "10h", "12h", "18h" };
 				const std::vector<uint16_t> intervals = { 5, 10, 15, 30, 60, 90, 120, 180, 240, 300, 600, 900, 1200, 1800, 3600, 5400, 7200, 10800, 14400, 18000, 21600, 28800, 36000, 43200, 64800 };
-				int8_t inc = 0;
-				if (action == OptionChangeAction::INCREMENT_SMALL)
-					inc = 1;
-				else if (action == OptionChangeAction::DECREMENT_SMALL)
-					inc = -1;
-				int8_t newIdx = _periodIdx + inc;
-				if (newIdx < 0)
-					newIdx = labels.size() - 1;
-				_periodIdx = newIdx % labels.size();
+				_periodIdx = ((_periodIdx + dir < 0 ? (labels.size() - 1) : (_periodIdx + dir))) % labels.size();
 				getOption(Options::PERIOD).setTitle("Period: " + labels.at(_periodIdx));
+				_app->getSettings().setEntry(ThSettings::Entries::PERIOD, intervals.at(_periodIdx));
+				draw();
+			}
+			
+			if (_selectedOptionIdx == static_cast<uint8_t>(Options::N_MEASUREMENTS)) {
+				const uint8_t thresholds[] = { 0, 10, 20, 30, static_cast<uint8_t>(-1) };
+				const uint16_t increments[] = { 1, 10, 100, 1000, 10000 };
+				int16_t increment = dir;
+				for (uint8_t i = 0; i < std::size(thresholds); ++i) {
+					if (stepCounter <= thresholds[i]) {
+						increment *= increments[i];
+						break;
+					}
+				}
+				
+				const uint16_t N = _app->getSettings().getEntry<uint16_t>(ThSettings::Entries::N_MEASUREMENTS);
+				const uint16_t MAX_N = 65000; // must be lower than static_cast<uint16_t>(-2)
+				int32_t newN = (N == static_cast<uint16_t>(-1) ? -1 : N) + increment;
+				if (newN <= 0)
+					newN = (increment > 0) - (increment < 0); // sign of increment
+				else if (newN < 1)
+					newN = 1;
+				else if (newN > MAX_N)
+					newN = MAX_N;
+				const uint16_t finalN = static_cast<uint16_t>(newN);
+				DLOG("N="); LOG(N); LOG(" | newN="); LOG(newN); LOG(" | finalN="); LOGLN(finalN);
+				const String title = newN == -1 ? "Unlimited" : ("N = " + String(finalN));
+				getOption(Options::N_MEASUREMENTS).setTitle(title);
+				_app->getSettings().setEntry(ThSettings::Entries::N_MEASUREMENTS, finalN);
 				draw();
 			}
 		}

@@ -19,19 +19,35 @@ public:
 #define PUSHBUTTON_PIN_UNASSIGNED 0xff
 class PushButton : public VButton {
 	uint8_t _pin = PUSHBUTTON_PIN_UNASSIGNED;
+	uint16_t _stepCounter = 0;
 public:
 	PushButton() = default;
 	PushButton(uint8_t pin) {
 		init(pin);
 	}
+
 	bool init(uint8_t pin) {
 		_pin = pin;
 		pinMode(_pin, INPUT_PULLUP);
 		return true;
 	}
+
 	bool tick() {
 		return poll(!digitalRead(_pin));
 	}
+
+    bool step() {
+		if (VButton::releaseStep()) {
+			_stepCounter = 0;
+			return false;
+		}
+		bool ret = VButton::step();
+		if (ret)
+			_stepCounter++;
+		return ret;
+	}
+
+	inline uint16_t getStepCounter() const { return _stepCounter; }
 };
 
 /// @brief Helping class for easing managing hardware inputs (button pushes)

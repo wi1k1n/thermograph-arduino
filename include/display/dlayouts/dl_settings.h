@@ -21,9 +21,9 @@ protected:
 	enum class OptionChangeAction {
 		NONE = 0,
 		INCREMENT_SMALL,
-		INCREMENT_BIG,
+		INCREMENT_STEP,
 		DECREMENT_SMALL,
-		DECREMENT_BIG
+		DECREMENT_STEP
 	};
 
 public:
