@@ -44,6 +44,7 @@ public:
 
 /// @brief DLGUI element that implements a button: contains title, can be focused and pressed
 class DLButton : public DLGUI, public DLGUIFocusable, public DLGUIPressable {
+protected:
     UPoint _pos;
     UPoint _size;
     String _title;
@@ -57,11 +58,26 @@ public:
     void draw(bool doDisplay = false, bool clearFirst = true) override;
 	void clear(bool doDisplay = false) override;
     
+    void setTitle(const String& newTitle, bool reDraw = false, bool doDisplay = false);
     void setFocused(bool focused = true, bool reDraw = false, bool doDisplay = false);
     void setPressed(bool pressed = true, bool reDraw = false, bool doDisplay = false);
 };
 
+class DLSpinButton : public DLButton {
+public:
+    bool init(Display* display, UPoint pos, UPoint size, const String& title, bool visible = true, bool focused = false, bool pressed = false, bool arrowLeft = true, bool arrowRight = true);
+
+    void draw(bool doDisplay = false, bool clearFirst = true) override;
+
+    void setArrows(bool left, bool right);
+private:
+    bool _arrowLeft = true;
+    bool _arrowRight = true;
+};
+
 ////////////////////////////////////
+
+class Application;
 
 /// @brief Base class for any Display Layout class implementations.
 class DisplayLayout {

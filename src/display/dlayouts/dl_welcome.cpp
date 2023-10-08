@@ -1,4 +1,5 @@
 #include "display/dlayouts/dl_welcome.h"
+#include "application.h"
 #include "logo.h"
 
 bool DLayoutWelcome::init(Display* display, Application* app, HardwareInputs* inputs) {

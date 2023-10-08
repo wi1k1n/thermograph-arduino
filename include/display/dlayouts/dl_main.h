@@ -3,6 +3,8 @@
 
 #include "display/display_layout.h"
 
+class Application;
+
 /// @brief Main DL implementation. Shows real-time sensor values and allows to start BG task.
 class DLayoutMain : public DisplayLayout {
 	float _temp1;

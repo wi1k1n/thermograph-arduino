@@ -2,7 +2,8 @@
 #define DL_WELCOME_H__
 
 #include "display/display_layout.h"
-#include "main.h"
+
+class Application;
 
 class DLayoutWelcome : public DisplayLayout {
 	Timer _timer;

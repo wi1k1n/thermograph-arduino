@@ -1,7 +1,7 @@
 #ifndef FILESYSTEM_H__
 #define FILESYSTEM_H__
 
-#include "main.h"
+#include "application.h"
 #include "LittleFS.h"
 
 /// @brief Thermograph File System: A set of helping wrapping funcs for the LittleFS class
@@ -28,6 +28,8 @@ public:
 	static bool writeStruct(File& f, T& s);
 };
 
+//////////////////////////////////////////////
+
 /// @brief Baseclass for any structures that are stored in filesystem
 struct StorageStruct {
 	uint8_t versionMajor;
@@ -50,6 +52,8 @@ struct SStrConfig : StorageStruct {
 	SStrConfig(const SStrConfig&) = default;
 };
 
+//////////////////////////////////////////////
+
 /// @brief A useful class that consolidates different SStructs and provides and interface to work with them
 class Storage {
 	static bool retreiveSleeping();
@@ -60,6 +64,8 @@ public:
 	static const SStrSleeping& getSleeping(bool retrieve = false);
 	static bool setSleeping(size_t timeAwake, Application::Mode mode);
 	static bool removeSleeping();
+
+	static const SStrConfig& getConfig(bool retrieve = false);
 private:
 	static SStrConfig _config;
 	static SStrSleeping _sleeping;

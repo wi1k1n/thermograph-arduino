@@ -99,6 +99,8 @@ struct Point2 {
 	Point2() : x(T()), y(T()) { }
 	Point2(T v) : x(v), y(v) { }
 	Point2(T x, T y) : x(x), y(y) { }
+
+	String toString() const { return String(x) + "; " + String(y); }
 };
 typedef Point2<int16_t> Point;
 typedef Point2<uint16_t> UPoint;

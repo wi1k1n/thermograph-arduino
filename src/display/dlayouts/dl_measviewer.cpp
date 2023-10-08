@@ -1,5 +1,5 @@
 #include "display/dlayouts/dl_measviewer.h"
-#include "main.h"
+#include "application.h"
 
 bool DLayoutMeasViewer::init(Display* display, Application* app, HardwareInputs* inputs) {
 	bool success = DisplayLayout::init(display, app, inputs);

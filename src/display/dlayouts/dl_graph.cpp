@@ -1,5 +1,5 @@
 #include "display/dlayouts/dl_graph.h"
-#include "main.h"
+#include "application.h"
 
 void DLayoutGraph::update(void* data) {
 	DisplayLayout::update(data);

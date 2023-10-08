@@ -123,3 +123,10 @@ bool Storage::removeSleeping() {
 		return false;
 	return ThFS::remove(STORAGEKEY_ISSLEEPING);
 }
+
+const SStrConfig& Storage::getConfig(bool retrieve) {
+	if (retrieve) {
+		retreiveConfig();
+	}
+	return _config;
+}

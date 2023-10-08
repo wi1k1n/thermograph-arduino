@@ -3,6 +3,8 @@
 
 #include "display/display_layout.h"
 
+class Application;
+
 class DLayoutBackgroundInterrupted : public DisplayLayout {
 	DLButton _gBtn;
 public:

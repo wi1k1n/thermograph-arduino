@@ -1,8 +1,9 @@
-#ifndef MAIN_H__
-#define MAIN_H__
+#ifndef APPLICATION_H__
+#define APPLICATION_H__
 
 #include "Arduino.h"
 #include "sdk.h"
+#include "settings.h"
 #include "display/display.h"
 #include "display/display_layout.h"
 #include "sensor.h"
@@ -29,7 +30,7 @@ public:
 	inline void setModeInteract() { _mode = Mode::INTERACT; }
 
 	inline bool isInteractionAvailable() const { return isModeBackgroundInterrupted() || isModeInteract() ;}
-	
+
 	enum Mode {
 		BACKGROUND = 0,				// autonomously woke up while working in background
 		BACKGROUND_INTERRUPTED,		// background job in progress but user interrupt
@@ -38,6 +39,13 @@ public:
 		_DEBUG_LITTLEFS_EXPLORER,
 #endif
 	};
+
+private:
+	bool initDisplayStuff();
+
+	void showDisplayError();
+	bool debugInitLFSExplorer();
+
 private:
 	Mode _mode = Mode::BACKGROUND;
 
@@ -48,14 +56,10 @@ private:
 	DisplayLayoutKeys _dLayoutActiveKey = DisplayLayoutKeys::NONE;
 
 	HardwareInputs _inputs;
+	ThSettings _settings;
 	TempSensor _sensorTemp;
 
 	size_t _timeAwake = 0; // how much time
-
-	bool initDisplayStuff();
-
-	void showDisplayError();
-	bool debugInitLFSExplorer();
 };
 
-#endif // MAIN_H__
+#endif // APPLICATION_H__

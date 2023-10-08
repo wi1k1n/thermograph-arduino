@@ -3,6 +3,8 @@
 
 #include "display/display_layout.h"
 
+class Application;
+
 class DLayoutMeasViewer : public DisplayLayout {
 	float _temp1;
 	Timer _timerRandomPixel;

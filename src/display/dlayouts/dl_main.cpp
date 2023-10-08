@@ -1,11 +1,12 @@
 #include "display/dlayouts/dl_main.h"
-#include "main.h"
+#include "application.h"
 
 void DLayoutMain::drawGButtons(bool doDisplay) {
     _gBtnStart.draw(doDisplay);
     _gBtnResume.draw(doDisplay);
     _gBtnStop.draw(doDisplay);
 }
+
 void DLayoutMain::adjustGButtonsModeInteract() {
 	_gBtnResume.setFocused(false);
 	_gBtnStop.setFocused(false);
@@ -15,6 +16,7 @@ void DLayoutMain::adjustGButtonsModeInteract() {
 	_gBtnStop.setVisible(false);
 	_gBtnStart.setVisible(true);
 }
+
 void DLayoutMain::adjustGButtonsModeBGInterrupted() {
 	_gBtnResume.setFocused(false);
 	_gBtnStop.setFocused(false);
@@ -40,6 +42,7 @@ bool DLayoutMain::init(Display* display, Application* app, HardwareInputs* input
         && _gBtnResume.init(display, {(dWidth - 2 * bWidth - bPadding) / 2, bY}, bSize, "Resume", 0)
         && _gBtnStop.init(display, {(dWidth - 2 * bWidth - bPadding) / 2 + bWidth + bPadding, bY}, bSize, "Stop", 0);
 }
+
 void DLayoutMain::activate() {
     if (_app->isModeBackgroundInterrupted()) {
 		DLOGLN(F("DLMain activated in BI mode"));
@@ -51,16 +54,19 @@ void DLayoutMain::activate() {
 	_timerMeasure.start();
     DisplayLayout::activate();
 }
+
 void DLayoutMain::deactivate() {
 	_timerMeasure.stop();
     DisplayLayout::deactivate();
 }
+
 void DLayoutMain::update(void* data) {
 	DisplayLayout::draw(data);
 	TempSensorData* tempData = static_cast<TempSensorData*>(data);
 	_temp1 = tempData->temp;
 	draw();
 }
+
 void DLayoutMain::tick() {
 	DisplayLayout::tick();
 
@@ -79,7 +85,7 @@ void DLayoutMain::tick() {
 		return;
 	}
 	// _debugLED.on();
-	
+
 	// Only if btn2 is NOT pressed
 	if (!btn2->down()) {
 		// LOGLN("!2state");
@@ -133,6 +139,7 @@ void DLayoutMain::tick() {
 		}
 	}
 }
+
 void DLayoutMain::draw(bool doDisplay) {
 	DisplayLayout::draw(doDisplay);
 	// DLOGLN();
