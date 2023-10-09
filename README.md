@@ -1,6 +1,8 @@
 # Thermograph v2
 
-This is a second iteration of the thermograph project, that haven't completely succeeded before.
+This is a second iteration of the Thermograph project, that was a great try and showed solid prospectives but didn't get to any finished state, hence didn't succeed.
+
+Thermograph - is a small battery-powered device that measures temperature over time and collects the data. It is implemented on ESP8266-based microcontroller using Arduino library.
 
 ## Desired Specifications
 
@@ -8,7 +10,7 @@ Should...
 
 - be an autonomous device with a small display and a couple of buttons for the interaction
 - be capable of permanently storing some amount of data and allowing to visualize and explore stored data
-- be capable of streaming data: Serial, Wi-Fi ~~(if allowed by hardware)~~
+- be capable of streaming data: Serial, Wi-Fi, Bluetooth(?)
 - contain internal temperature sensor such that it can be used as is (without any extra wires)
 - be capable of using extended temperature sensor (ideally thermocouple e.g. MAX31855)
 - be designed to not being limited from adding extra sensor (e.g. light sensor)
