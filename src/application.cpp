@@ -45,7 +45,7 @@ bool Application::setup() {
 		return false;
 	reportInitialized(3, "Storage manager initialized");
 
-	if (!_settings.init())
+	if (!_settings.init(this))
 		return false;
 	reportInitialized(4, "Settings manager initialized");
 	
@@ -92,11 +92,20 @@ bool Application::setup() {
 	return true;
 }
 
+/////////////////////////////////////////////////////////////////////////
+
 void Application::loop() {
 #ifdef TDEBUG
 	if (_mode == Mode::_DEBUG_LITTLEFS_EXPLORER)
 		return DEBUG::LittleFSExplorer("");
 #endif
+
+	// Measurement-related ticks
+	if (_measurementTimer.tick()) {
+		makeMeasurement();
+	}
+
+	// Display-related ticks
 	_display.tick(); // out of the interact mode scope because of display error led timer
 	if (isInteractionAvailable()) {
 		_dltransMain.tick();
@@ -112,7 +121,7 @@ void Application::makeMeasurement() {
 			if (isInteractionAvailable()) {
 				_dLayouts[DisplayLayoutKeys::MAIN]->update(dataPtr);
 			}
-			// LOG(F("Temperature: "));
+			LOG(F("Temperature: "));
 			LOGLN(dataPtr->temp);
 		} else {
 			LOGLN(F("Couldn't get measurement even after 1s!"));

@@ -17,7 +17,11 @@ template<> uint16_t ThSettings::getEntryDefault(const Entries& entry) const {
 	return 0;
 }
 
-bool ThSettings::init() {
+bool ThSettings::init(Application* app) {
+	if (!app)
+		return false;
+	_app = app;
+
 	SStrConfig& config = Storage::getConfig();
 	if (!config.period || !config.nMeasurements) {
 		_periodMeasurement = getEntryDefault<uint16_t>(Entries::PERIOD);
@@ -43,6 +47,7 @@ bool ThSettings::storeConfig() {
 template<> bool ThSettings::setEntry(const Entries& entry, const uint16_t& val) {
 	if (entry == Entries::PERIOD) {
 		_periodMeasurement = val;
+		_app->setTimerMeasurementPeriod(_periodMeasurement);
 		return true;
 	}
 	if (entry == Entries::N_MEASUREMENTS) {

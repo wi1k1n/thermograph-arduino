@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 
+class Application;
+
 class ThSettings {
 public:
 	enum class Entries {
@@ -12,7 +14,7 @@ public:
 public:
 	ThSettings() = default;
 
-	bool init();
+	bool init(Application* app);
 
 	template<typename T>
 	const T& getEntry(const Entries& entry) const;
@@ -23,6 +25,8 @@ public:
 
 	bool storeConfig();
 private:
+	Application* _app = nullptr;
+	
 	uint16_t _periodMeasurement = 600; // in seconds
 	uint16_t _numberOfMeasurements = 144;
 };

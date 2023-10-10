@@ -22,13 +22,16 @@ public:
 
 	inline DisplayLayout* getActiveDisplayLayout() { return _dLayouts[_dLayoutActiveKey].get(); }
 	void activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransitionStyle style = DLTransitionStyle::AUTO, bool force = false);
+
+	void setTimerMeasurementPeriod(uint32_t period) { _measurementTimer.setTime(period); }
+	void startTimerMeasurement() { _measurementTimer.start(); }
+	void stopTimerMeasurement() { _measurementTimer.stop(); }
 	
 	inline bool isModeBackground() const { return _mode == Mode::BACKGROUND; }
 	inline bool isModeBackgroundInterrupted() const { return _mode == Mode::BACKGROUND_INTERRUPTED; }
 	inline bool isModeInteract() const { return _mode == Mode::INTERACT; }
 	inline void setModeBackgroundInterrupted() { _mode = Mode::BACKGROUND_INTERRUPTED; }
 	inline void setModeInteract() { _mode = Mode::INTERACT; }
-
 	inline bool isInteractionAvailable() const { return isModeBackgroundInterrupted() || isModeInteract() ;}
 
 	inline const ThSettings& getSettings() const { return _settings; }
@@ -61,6 +64,8 @@ private:
 	HardwareInputs _inputs;
 	ThSettings _settings;
 	TempSensor _sensorTemp;
+
+	TimerMs _measurementTimer;
 
 	size_t _timeAwake = 0; // how much time
 };

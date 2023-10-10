@@ -144,9 +144,6 @@ void DLayoutSettings::tick() {
 
 	// We are in the option changing mode
 	if (_mode == SettingsMode::OPTION_CHANGING) {
-		// if (!btn1->down() && btn2->click()) { // next option
-		// 	selectOption((_selectedOptionIdx + 1) % _options.size());
-		// }
 		if (btn1->down() && btn2->down()) { // exit to option selection mode
 			_app->getSettings().storeConfig();
 			return changeMode(SettingsMode::OPTION_SELECTION);
@@ -208,9 +205,6 @@ void DLayoutSettings::tick() {
 				else if (newN > MAX_N)
 					newN = MAX_N;
 				const uint16_t finalN = static_cast<uint16_t>(newN);
-				// DLOG("N="); LOG(N); LOG(" | newN="); LOG(newN); LOG(" | finalN="); LOGLN(finalN);
-				// const String title = newN == -1 ? "Unlimited" : ("N = " + String(finalN));
-				// getOption(Options::N_MEASUREMENTS).setTitle(title);
 
 				_app->getSettings().setEntry(ThSettings::Entries::N_MEASUREMENTS, finalN);
 				getOption(Options::N_MEASUREMENTS).setTitle(retrieveOptionTitle(Options::N_MEASUREMENTS));
@@ -218,10 +212,6 @@ void DLayoutSettings::tick() {
 				draw();
 			}
 		}
-		
-		// if (!btn2->down() && btn1->held()) { // enter option changing mode
-		// 	return changeMode(SettingsMode::OPTION_CHANGING);
-		// }
 	}
 }
 

@@ -89,10 +89,10 @@ protected:
 public:
 	DisplayLayout() = default;
 	virtual bool init(Display* display, Application* app, HardwareInputs* inputs);
-	virtual void activate() { draw(); } // should be called when layout is entered
-	virtual void deactivate() { }
+	virtual void activate() { draw(); }     ///< Is executed when layout is entered
+	virtual void deactivate() { }           ///< Is executed when layout is left
 	virtual void draw(bool doDisplay = true) { } // doDisplay forces _display->display() in the end of the function
-	virtual void update(void* data) { }
+	virtual void update(void* data) { }     ///< Is executed when layout needs recalculating something
 	virtual void tick() { }
 };
 

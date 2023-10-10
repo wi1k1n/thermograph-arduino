@@ -7,19 +7,6 @@ class Application;
 
 /// @brief Main DL implementation. Shows real-time sensor values and allows to start BG task.
 class DLayoutMain : public DisplayLayout {
-	float _temp1;
-    
-    DLButton _gBtnStart;
-    DLButton _gBtnResume;
-    DLButton _gBtnStop;
-
-	Timer _timerMeasure;
-
-	LED _debugLED;
-	
-	void drawGButtons(bool doDisplay = false);
-	void adjustGButtonsModeInteract();
-	void adjustGButtonsModeBGInterrupted();
 public:
 	bool init(Display* display, Application* app, HardwareInputs* inputs) override;
 	void activate() override;
@@ -27,6 +14,14 @@ public:
 	void draw(bool doDisplay = true) override;
 	void update(void* data) override;
 	void tick() override;
+
+private:
+	void updateButtonTitle(bool doDisplay = false);
+
+private:
+	float _temp1 = -1;
+	DLButton _gBtnMain;
+	LED _debugLED;
 };
 
 #endif // DL_MAIN_H__
