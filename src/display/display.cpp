@@ -136,6 +136,9 @@ void DLTransition::start(DisplayLayout* layoutFrom, DisplayLayout* layoutTo, Dis
 	_displayLayout2 = layoutTo;
 	_direction = direction;
 
+	_displayLayout2->transitionEnterStarted();
+	_displayLayout1->transitionLeaveStarted();
+
 	_isRunning = true;
 	_curBuffersShift = 0;
 	uint16_t bufferSize = _display->rawWidth() * _display->rawHeight() / _display->pixelDepth();
@@ -154,7 +157,7 @@ void DLTransition::start(DisplayLayout* layoutFrom, DisplayLayout* layoutTo, Dis
 	memcpy(display()->getBuffer(), tempBuff, bufferSize);
 	delete[] tempBuff;
 
-	_displayLayout1->deactivate();
+	// _displayLayout1->deactivate();
 	
 	_startedTimestamp = millis();
 	tick();
@@ -197,7 +200,8 @@ void DLTransition::tick() {
 	_curBuffersShift += amountForCurBuffers;
 	if (curTime - _startedTimestamp >= _duration) {
 		stop();
-		_displayLayout2->activate();
+		_displayLayout2->transitionEnterFinished();
+		_displayLayout1->transitionLeaveFinished();
 		return;
 	}
 }

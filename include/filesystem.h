@@ -48,8 +48,9 @@ struct SStrSleeping : StorageStruct {
 };
 /// @brief SStruct that keeps configuration parameters for the device itself
 struct SStrConfig : StorageStruct {
-	uint16_t period = 0;
+	uint16_t periodCapture = 0;
 	uint16_t nMeasurements = 0;
+	uint16_t periodLive = 0;
 	
 	SStrConfig() = default;
 	SStrConfig(const SStrConfig&) = default;

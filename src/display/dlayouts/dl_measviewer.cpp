@@ -8,12 +8,12 @@ bool DLayoutMeasViewer::init(Display* display, Application* app, HardwareInputs*
 void DLayoutMeasViewer::update(void* data) {
 	DisplayLayout::update(data);
 }
-void DLayoutMeasViewer::activate() {
-	DisplayLayout::activate();
+void DLayoutMeasViewer::transitionEnterFinished() {
+	DisplayLayout::transitionEnterFinished();
 	_timerRandomPixel.start();
 }
-void DLayoutMeasViewer::deactivate() {
-	DisplayLayout::deactivate();
+void DLayoutMeasViewer::transitionLeaveStarted() {
+	DisplayLayout::transitionLeaveStarted();
 	_timerRandomPixel.stop();
 }
 void DLayoutMeasViewer::tick() {

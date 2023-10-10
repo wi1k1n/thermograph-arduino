@@ -8,8 +8,9 @@ class Application;
 class ThSettings {
 public:
 	enum class Entries {
-		PERIOD = 0,
-		N_MEASUREMENTS
+		PERIOD_CAPTURE = 0, 	// uint16_t, in seconds; // TODO: change for more compact way of storing the index
+		N_MEASUREMENTS, 		// uint16_t
+		PERIOD_LIVE 			// uint16_t, in ms
 	};
 public:
 	ThSettings() = default;
@@ -26,9 +27,10 @@ public:
 	bool storeConfig();
 private:
 	Application* _app = nullptr;
-	
-	uint16_t _periodMeasurement = 600; // in seconds
+
+	uint16_t _periodCaptureMeasurement = 600; 	// in seconds
 	uint16_t _numberOfMeasurements = 144;
+	uint16_t _periodLiveMeasurement = 1000; 	// in ms
 };
 
 #endif // SETTINGS_H__

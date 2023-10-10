@@ -11,10 +11,11 @@ class DLayoutMeasViewer : public DisplayLayout {
 public:
 	bool init(Display* display, Application* app, HardwareInputs* inputs) override;
 	void draw(bool doDisplay = true) override;
-	void activate() override;
-	void deactivate() override;
 	void update(void* data) override;
 	void tick() override;
+	
+	void transitionEnterFinished() override;
+	void transitionLeaveStarted() override;
 };
 
 #endif // DL_MEASVIEWER_H__

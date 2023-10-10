@@ -18,7 +18,7 @@ static uint8_t getPeriodIdxByInterval(uint16_t interval) {
 String DLayoutSettings::retrieveOptionTitle(const Options& option) {
 	ThSettings& settings = _app->getSettings();
 	if (option == Options::PERIOD) {
-		uint16_t period = settings.getEntry<uint16_t>(ThSettings::Entries::PERIOD);
+		uint16_t period = settings.getEntry<uint16_t>(ThSettings::Entries::PERIOD_CAPTURE);
 		uint8_t idx = getPeriodIdxByInterval(period);
 		if (idx == 255)
 			return "Error!";
@@ -53,13 +53,13 @@ void DLayoutSettings::update(void* data) {
 	DisplayLayout::update(data);
 }
 
-void DLayoutSettings::activate() {
-	DisplayLayout::activate();
+void DLayoutSettings::transitionEnterFinished() {
+	DisplayLayout::transitionEnterFinished();
 	_timerRandomPixel.start();
 }
 
-void DLayoutSettings::deactivate() {
-	DisplayLayout::deactivate();
+void DLayoutSettings::transitionLeaveStarted() {
+	DisplayLayout::transitionLeaveStarted();
 	_timerRandomPixel.stop();
 }
 
@@ -174,11 +174,11 @@ void DLayoutSettings::tick() {
 		if (action != OptionChangeAction::NONE) {
 			if (_selectedOptionIdx == static_cast<uint8_t>(Options::PERIOD)) {
 				uint8_t periodEntriesSize = std::size(periodIntervals);
-				uint16_t curInterval = _app->getSettings().getEntry<uint16_t>(ThSettings::Entries::PERIOD);
+				uint16_t curInterval = _app->getSettings().getEntry<uint16_t>(ThSettings::Entries::PERIOD_CAPTURE);
 				uint8_t curIdx = getPeriodIdxByInterval(curInterval);
 				uint8_t newIdx = ((curIdx + dir < 0 ? (periodEntriesSize - 1) : (curIdx + dir))) % periodEntriesSize;
 				
-				_app->getSettings().setEntry(ThSettings::Entries::PERIOD, periodIntervals[newIdx]);
+				_app->getSettings().setEntry(ThSettings::Entries::PERIOD_CAPTURE, periodIntervals[newIdx]);
 				getOption(Options::PERIOD).setTitle(retrieveOptionTitle(Options::PERIOD));
 
 				draw();

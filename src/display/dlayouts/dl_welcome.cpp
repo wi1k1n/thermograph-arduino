@@ -9,12 +9,12 @@ bool DLayoutWelcome::init(Display* display, Application* app, HardwareInputs* in
 void DLayoutWelcome::update(void* data) {
 	DisplayLayout::update(data);
 }
-void DLayoutWelcome::activate() {
-	DisplayLayout::activate();
+void DLayoutWelcome::transitionEnterFinished() {
+	DisplayLayout::transitionEnterFinished();
 	_timer.start();
 }
-void DLayoutWelcome::deactivate() {
-	DisplayLayout::deactivate();
+void DLayoutWelcome::transitionLeaveStarted() {
+	DisplayLayout::transitionLeaveStarted();
 	_timer.stop();
 }
 void DLayoutWelcome::tick() {

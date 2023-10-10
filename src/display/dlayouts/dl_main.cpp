@@ -23,12 +23,19 @@ bool DLayoutMain::init(Display* display, Application* app, HardwareInputs* input
 	return success;
 }
 
-void DLayoutMain::activate() {
-    DisplayLayout::activate();
+void DLayoutMain::transitionEnterStarted() {
+    DisplayLayout::transitionEnterStarted();
+	_app->startRealtimeMeasurement(true);
 }
 
-void DLayoutMain::deactivate() {
-    DisplayLayout::deactivate();
+void DLayoutMain::transitionEnterFinished() {
+    DisplayLayout::transitionEnterFinished();
+	draw();
+}
+
+void DLayoutMain::transitionLeaveStarted() {
+    DisplayLayout::transitionLeaveStarted();
+	_app->stopRealtimeMeasurement();
 }
 
 void DLayoutMain::update(void* data) {
@@ -37,7 +44,8 @@ void DLayoutMain::update(void* data) {
 	TempSensorData* tempData = static_cast<TempSensorData*>(data);
 	_temp1 = tempData->temp;
 
-	draw();
+	if (_app->isActiveLayoutKey(DisplayLayoutKeys::MAIN))
+		draw();
 }
 
 void DLayoutMain::tick() {
@@ -75,7 +83,7 @@ void DLayoutMain::tick() {
 			_app->setModeInteract();
 			_gBtnMain.setPressed(false);
 			updateButtonTitle();
-			_app->stopTimerMeasurement();
+			_app->stopBackgroundJob();
 		}
 		draw();
 		return;
@@ -90,7 +98,7 @@ void DLayoutMain::tick() {
 			_app->setModeBackgroundInterrupted();
 			_gBtnMain.setPressed(false);
 			updateButtonTitle();
-			_app->startTimerMeasurement();
+			_app->startBackgroundJob();
 		}
 		draw();
 		return;
@@ -155,18 +163,20 @@ void DLayoutMain::draw(bool doDisplay) {
 	// DLOGLN();
 	display()->clearDisplay();
 
-	display()->setTextColor(DISPLAY_WHITE);
+	{ // Draw temperature value
+		display()->setTextColor(DISPLAY_WHITE);
 
-	char buffer[16];
-	dtostrf(_temp1, 6, 1, buffer);
-	
-	display()->setCursor(0, 16);
-	display()->setTextSize(3);
-	display()->print(buffer);
+		char buffer[16];
+		dtostrf(_temp1, 6, 1, buffer);
+		
+		display()->setCursor(0, 16);
+		display()->setTextSize(3);
+		display()->print(buffer);
 
-	display()->setCursor(display()->getCursorX(), display()->getCursorY() - 4);
-	display()->setTextSize(2);
-	display()->print(F("o"));
+		display()->setCursor(display()->getCursorX(), display()->getCursorY() - 4);
+		display()->setTextSize(2);
+		display()->print(F("o"));
+	}
 	
 	display()->setCursor(0, 0);
 	display()->setTextSize(1);

@@ -9,17 +9,20 @@ class Application;
 class DLayoutMain : public DisplayLayout {
 public:
 	bool init(Display* display, Application* app, HardwareInputs* inputs) override;
-	void activate() override;
-	void deactivate() override;
 	void draw(bool doDisplay = true) override;
 	void update(void* data) override;
 	void tick() override;
+
+	void transitionEnterStarted() override;
+	void transitionEnterFinished() override;
+	void transitionLeaveStarted() override;
 
 private:
 	void updateButtonTitle(bool doDisplay = false);
 
 private:
-	float _temp1 = -1;
+	float _temp1 = 0;
+
 	DLButton _gBtnMain;
 	LED _debugLED;
 };

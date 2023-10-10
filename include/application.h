@@ -20,12 +20,23 @@ public:
 	bool startBackgroundJob();
 	bool stopBackgroundJob();
 
-	inline DisplayLayout* getActiveDisplayLayout() { return _dLayouts[_dLayoutActiveKey].get(); }
+	inline DisplayLayout* getActiveDisplayLayout() {
+		if (_dLayoutActiveKey == DisplayLayoutKeys::NONE || _dltransMain.isRunning())
+			return nullptr;
+		return _dLayouts[_dLayoutActiveKey].get();
+	}
+	DisplayLayoutKeys getActiveLayoutKey() const { return _dltransMain.isRunning() ? DisplayLayoutKeys::NONE : _dLayoutActiveKey; }
+	bool isActiveLayoutKey(DisplayLayoutKeys key) { return getActiveLayoutKey() == key; }
 	void activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransitionStyle style = DLTransitionStyle::AUTO, bool force = false);
 
-	void setTimerMeasurementPeriod(uint32_t period) { _measurementTimer.setTime(period); }
-	void startTimerMeasurement() { _measurementTimer.start(); }
-	void stopTimerMeasurement() { _measurementTimer.stop(); }
+	// This timer is only for live preview of the temperature while in interactive mode
+	void setRealtimeMeasurementPeriod(uint32_t period) { _realtimeMeasurementTimer.setTime(period); }
+	void stopRealtimeMeasurement() { _realtimeMeasurementTimer.stop(); }
+	void startRealtimeMeasurement(bool triggerInstanly = false) {
+		_realtimeMeasurementTimer.start();
+		if (triggerInstanly)
+			_realtimeMeasurementTimer.force();
+	}
 	
 	inline bool isModeBackground() const { return _mode == Mode::BACKGROUND; }
 	inline bool isModeBackgroundInterrupted() const { return _mode == Mode::BACKGROUND_INTERRUPTED; }
@@ -65,9 +76,9 @@ private:
 	ThSettings _settings;
 	TempSensor _sensorTemp;
 
-	TimerMs _measurementTimer;
+	TimerMs _realtimeMeasurementTimer;
 
-	size_t _timeAwake = 0; // how much time
+	// size_t _timeAwake = 0; // how much time
 };
 
 #endif // APPLICATION_H__

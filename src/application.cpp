@@ -1,9 +1,11 @@
 #include "application.h"
 
 #include "filesystem.h"
+
 #ifdef TDEBUG
 #include "lfsexplorer.h"
 #endif
+
 #include "display/dlayouts/dl_bginterrupted.h"
 #include "display/dlayouts/dl_measviewer.h"
 #include "display/dlayouts/dl_graph.h"
@@ -101,7 +103,7 @@ void Application::loop() {
 #endif
 
 	// Measurement-related ticks
-	if (_measurementTimer.tick()) {
+	if (_realtimeMeasurementTimer.tick()) {
 		makeMeasurement();
 	}
 
@@ -109,36 +111,37 @@ void Application::loop() {
 	_display.tick(); // out of the interact mode scope because of display error led timer
 	if (isInteractionAvailable()) {
 		_dltransMain.tick();
-		getActiveDisplayLayout()->tick();
+		if (DisplayLayout* activeDL = getActiveDisplayLayout())
+			activeDL->tick();
 	}
 }
 
 void Application::makeMeasurement() {
-	// TODO: refactor in a proper way
-	if (_sensorTemp.measure()) {
-		TempSensorData* dataPtr = static_cast<TempSensorData*>(_sensorTemp.waitForMeasurement());
-		if (dataPtr) {
-			if (isInteractionAvailable()) {
-				_dLayouts[DisplayLayoutKeys::MAIN]->update(dataPtr);
-			}
-			LOG(F("Temperature: "));
-			LOGLN(dataPtr->temp);
-		} else {
-			LOGLN(F("Couldn't get measurement even after 1s!"));
-		}
-	} else {
+	if (!_sensorTemp.measure()) {
 		LOGLN(F("Couldn't start measuring temperature!"));
+		return;
 	}
+	// TODO: refactor in a proper way
+	TempSensorData* dataPtr = static_cast<TempSensorData*>(_sensorTemp.waitForMeasurement()); // TODO: please, no blocking function calls!!!
+	if (!dataPtr) {
+		LOGLN(F("Couldn't get measurement even after 1s!"));
+		return;
+	}
+	if (isInteractionAvailable())
+		_dLayouts[DisplayLayoutKeys::MAIN]->update(dataPtr);
+	
+	LOG(F("Temperature: "));
+	LOGLN(dataPtr->temp);
 }
 bool Application::startBackgroundJob() {
 	const SStrSleeping& sleeping = Storage::getSleeping();
 	if (!Storage::setSleeping(millis() + sleeping.timeAwake, _mode))
 		return false;
-	if (isModeInteract() || isModeBackgroundInterrupted()) {
+	if (isModeInteract() || isModeBackgroundInterrupted()) { // TODO: should not happen here, rather by sleep-timer or by explicit button click
 		_display->clearDisplay();
 		_display->display();
 	}
-	ESP.deepSleep(5e6);
+	ESP.deepSleep(_settings.getEntry<uint16_t>(ThSettings::Entries::PERIOD_CAPTURE) * 1e6);
 	return true;
 }
 
@@ -155,7 +158,12 @@ void Application::activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransiti
 	DisplayLayout* target = _dLayouts[dLayoutKey].get();
 
 	if (style == DLTransitionStyle::NONE) {
-		target->activate();
+		target->transitionEnterStarted();
+		if (DisplayLayout* activeDL = getActiveDisplayLayout())
+			activeDL->transitionLeaveStarted();
+		target->transitionEnterFinished();
+		if (DisplayLayout* activeDL = getActiveDisplayLayout())
+			activeDL->transitionLeaveFinished();
 	} else {
 		Display::ScrollDir direction = Display::ScrollDir::LEFT;
 		switch (style) {
@@ -172,10 +180,11 @@ void Application::activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransiti
 		}
 		_dltransMain.start(getActiveDisplayLayout(), target, direction);
 	}
-	_dLayoutActiveKey = dLayoutKey;
+	_dLayoutActiveKey = dLayoutKey; // TODO: should be set only after transition is finished??
 	
 	// Some flags can persist from previous layouts control handling, reset them
 	// TODO: better design, please!
+	// TODO: does this even work??
 	if (PushButton* btn = static_cast<PushButton*>(_inputs.getInput(HIChannel::BUTTON1)))
 		btn->reset();
 	if (PushButton* btn = static_cast<PushButton*>(_inputs.getInput(HIChannel::BUTTON2)))
