@@ -18,12 +18,13 @@ public:
 	void transitionLeaveStarted() override;
 
 private:
-	void updateButtonTitle(bool doDisplay = false);
+	void updateButtons(bool doDisplay = false);
 
 private:
 	float _temp1 = 0;
 
 	DLButton _gBtnMain;
+	DLButton _gBtnSleep;
 	LED _debugLED;
 };
 

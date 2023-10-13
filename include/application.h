@@ -17,6 +17,7 @@ public:
 	void loop();
 
 	void makeMeasurement();
+	bool sleep();
 	bool startBackgroundJob();
 	bool stopBackgroundJob();
 

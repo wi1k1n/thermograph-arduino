@@ -133,7 +133,7 @@ void Application::makeMeasurement() {
 	LOG(F("Temperature: "));
 	LOGLN(dataPtr->temp);
 }
-bool Application::startBackgroundJob() {
+bool Application::sleep() {
 	const SStrSleeping& sleeping = Storage::getSleeping();
 	if (!Storage::setSleeping(millis() + sleeping.timeAwake, _mode))
 		return false;
@@ -141,7 +141,12 @@ bool Application::startBackgroundJob() {
 		_display->clearDisplay();
 		_display->display();
 	}
-	ESP.deepSleep(_settings.getEntry<uint16_t>(ThSettings::Entries::PERIOD_CAPTURE) * 1e6);
+	ESP.deepSleep(_settings.getEntry<uint16_t>(ThSettings::Entries::PERIOD_CAPTURE) * 1e6); // TODO: this is generally wrong as doesn't account for time passed in BI-mode
+	return true;
+}
+
+bool Application::startBackgroundJob() {
+	setModeBackgroundInterrupted();
 	return true;
 }
 

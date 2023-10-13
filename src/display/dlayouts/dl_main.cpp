@@ -1,9 +1,11 @@
 #include "display/dlayouts/dl_main.h"
 #include "application.h"
 
-void DLayoutMain::updateButtonTitle(bool doDisplay) {
-	String title = _app->isModeBackgroundInterrupted() ? "Stop" : "Start";
+void DLayoutMain::updateButtons(bool doDisplay) {
+	String title = _app->isModeBackgroundInterrupted() ? "Stop" : "Start"; // TODO: there should be a consistent way to distinguish the modes!
 	_gBtnMain.setTitle(title);
+	
+	_gBtnSleep.setVisible(!_app->isModeInteract());
 }
 
 bool DLayoutMain::init(Display* display, Application* app, HardwareInputs* inputs) {
@@ -17,8 +19,9 @@ bool DLayoutMain::init(Display* display, Application* app, HardwareInputs* input
 	const uint8_t dWidth = _display->rawWidth();
     const uint16_t bY = _display->rawHeight() - bHeight;
 	
-	success &= _gBtnMain.init(display, {(dWidth - bWidth) / 2, bY}, bSize, "");
-	updateButtonTitle();
+	success &= _gBtnMain.init(display, {(dWidth - bWidth) / 2 - (bWidth + bPadding) / 2, bY}, bSize, "");
+	success &= _gBtnSleep.init(display, {(dWidth - bWidth) / 2 + (bWidth + bPadding) / 2, bY}, bSize, "Sleep");
+	updateButtons();
 
 	return success;
 }
@@ -26,6 +29,7 @@ bool DLayoutMain::init(Display* display, Application* app, HardwareInputs* input
 void DLayoutMain::transitionEnterStarted() {
     DisplayLayout::transitionEnterStarted();
 	_app->startRealtimeMeasurement(true);
+	updateButtons();
 }
 
 void DLayoutMain::transitionEnterFinished() {
@@ -73,34 +77,59 @@ void DLayoutMain::tick() {
 	}
 	
 	if (_app->isModeBackgroundInterrupted()) { // Measurements in progress
-		if (!btn2->down() && btn1->held()) { // Started pressing "Stop"
-			_gBtnMain.setPressed(true);
+		if (_gBtnSleep.isVisible()) {
+			if (!btn1->down() && btn2->held()) { // Started pressing "Sleep"
+				_gBtnSleep.setPressed(true);
+				draw();
+			}
+			if (btn1->down() && _gBtnSleep.isPressed()) { // Pressing "Sleep" interrupted
+				_gBtnSleep.setPressed(false);
+				draw();
+			}
+			if (!btn1->down() && btn2->release() && _gBtnSleep.isPressed()) { // Finished pressing "Sleep"
+				_app->sleep();
+				_gBtnSleep.setPressed(false);
+				_app->sleep();
+				draw();
+			}
 		}
-		if (btn2->down() && _gBtnMain.isPressed()) { // Pressing "Stop" interrupted
-			_gBtnMain.setPressed(false);
+
+		if (_gBtnMain.isVisible()) {
+			if (!btn2->down() && btn1->held()) { // Started pressing "Stop"
+				_gBtnMain.setPressed(true);
+				draw();
+			}
+			if (btn2->down() && _gBtnMain.isPressed()) { // Pressing "Stop" interrupted
+				_gBtnMain.setPressed(false);
+				draw();
+			}
+			if (!btn2->down() && btn1->release() && _gBtnMain.isPressed()) { // Finished pressing "Stop"
+				_app->setModeInteract();
+				_gBtnMain.setPressed(false);
+				updateButtons();
+				_app->stopBackgroundJob();
+				draw();
+			}
 		}
-		if (!btn2->down() && btn1->release() && _gBtnMain.isPressed()) { // Finished pressing "Stop"
-			_app->setModeInteract();
-			_gBtnMain.setPressed(false);
-			updateButtonTitle();
-			_app->stopBackgroundJob();
-		}
-		draw();
 		return;
 	} else if (_app->isModeInteract()) { // No ongoing measurements
-		if (!btn2->down() && btn1->held()) { // Started pressing "Start"
-			_gBtnMain.setPressed(true);
+		if (_gBtnMain.isVisible()) {
+			if (!btn2->down() && btn1->held()) { // Started pressing "Start"
+				_gBtnMain.setPressed(true);
+				draw();
+			}
+			if (btn2->down() && _gBtnMain.isPressed()) { // Pressing "Start" interrupted
+				_gBtnMain.setPressed(false);
+				draw();
+			}
+			if (!btn2->down() && btn1->release() && _gBtnMain.isPressed()) { // Finished pressing "Start"
+				_app->setModeBackgroundInterrupted();
+				_gBtnMain.setPressed(false);
+				updateButtons();
+				_app->startBackgroundJob();
+				draw();
+			}
 		}
-		if (btn2->down() && _gBtnMain.isPressed()) { // Pressing "Start" interrupted
-			_gBtnMain.setPressed(false);
-		}
-		if (!btn2->down() && btn1->release() && _gBtnMain.isPressed()) { // Finished pressing "Start"
-			_app->setModeBackgroundInterrupted();
-			_gBtnMain.setPressed(false);
-			updateButtonTitle();
-			_app->startBackgroundJob();
-		}
-		draw();
 		return;
 	}
 
@@ -183,6 +212,7 @@ void DLayoutMain::draw(bool doDisplay) {
 	display()->print(F("Thermograph v2"));
 	
 	_gBtnMain.draw();
+	_gBtnSleep.draw();
 
 	if (doDisplay) {
 		display()->display();
