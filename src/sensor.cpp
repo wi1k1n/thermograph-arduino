@@ -1,5 +1,4 @@
 #include "sensor.h"
-#include "sdk.h"
 #include <exception>
 
 // wait for measurement to be ready in timeout (in ms)
@@ -20,7 +19,8 @@ bool TempSensor::init() {
 
 // starts measurement, returns true if successfully started, false if there was an error
 bool TempSensor::measure() {
-	// _data.temp = 123;
+	if (!Sensor::measure())
+		return false;
 	_data.temp = (int)analogRead(A0);
 	return true;
 }

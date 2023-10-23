@@ -48,6 +48,12 @@ bool ThSettings::storeConfig() {
 	config.periodLive = getEntry<uint16_t>(Entries::PERIOD_LIVE);
 	if (!Storage::storeConfig())
 		return false;
+	DLOG("Config stored! Values: ");
+	LOG(config.periodCapture);
+	LOG(" | ");
+	LOG(config.nMeasurements);
+	LOG(" | ");
+	LOGLN(config.periodLive);
 	return true;
 }
 

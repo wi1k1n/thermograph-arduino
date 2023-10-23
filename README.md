@@ -27,4 +27,9 @@ Should...
 	- LittleFS is used
 - The codebase should address the power supply is limits (e.g. using deep sleeping, when possible). Possible power supply: a couple of AA or AAA batteries
 
+### Data file format
+
+VERSION - 1 byte
+
+
 ### TODO List:

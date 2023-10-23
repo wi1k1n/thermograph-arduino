@@ -2,10 +2,10 @@
 #include "application.h"
 
 void DLayoutMain::updateButtons(bool doDisplay) {
-	String title = _app->isModeBackgroundInterrupted() ? "Stop" : "Start"; // TODO: there should be a consistent way to distinguish the modes!
+	String title = _app->isInProgress() ? "Stop" : "Start"; // TODO: there should be a consistent way to distinguish the modes!
 	_gBtnMain.setTitle(title);
 	
-	_gBtnSleep.setVisible(!_app->isModeInteract());
+	_gBtnSleep.setVisible(_app->isInProgress());
 }
 
 bool DLayoutMain::init(Display* display, Application* app, HardwareInputs* inputs) {
@@ -76,7 +76,7 @@ void DLayoutMain::tick() {
 		return;
 	}
 	
-	if (_app->isModeBackgroundInterrupted()) { // Measurements in progress
+	if (_app->isInProgress()) { // Measurements in progress
 		if (_gBtnSleep.isVisible()) {
 			if (!btn1->down() && btn2->held()) { // Started pressing "Sleep"
 				_gBtnSleep.setPressed(true);
@@ -87,10 +87,9 @@ void DLayoutMain::tick() {
 				draw();
 			}
 			if (!btn1->down() && btn2->release() && _gBtnSleep.isPressed()) { // Finished pressing "Sleep"
-				_app->sleep();
 				_gBtnSleep.setPressed(false);
 				_app->sleep();
-				draw();
+				DLOGLN("WARNING! Execution should haven't been getting to this point!");
 			}
 		}
 
@@ -104,10 +103,9 @@ void DLayoutMain::tick() {
 				draw();
 			}
 			if (!btn2->down() && btn1->release() && _gBtnMain.isPressed()) { // Finished pressing "Stop"
-				_app->setModeInteract();
+				_app->stopBackgroundJob();
 				_gBtnMain.setPressed(false);
 				updateButtons();
-				_app->stopBackgroundJob();
 				draw();
 			}
 		}
@@ -123,10 +121,9 @@ void DLayoutMain::tick() {
 				draw();
 			}
 			if (!btn2->down() && btn1->release() && _gBtnMain.isPressed()) { // Finished pressing "Start"
-				_app->setModeBackgroundInterrupted();
+				_app->startBackgroundJob();
 				_gBtnMain.setPressed(false);
 				updateButtons();
-				_app->startBackgroundJob();
 				draw();
 			}
 		}

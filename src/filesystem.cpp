@@ -28,7 +28,7 @@ bool ThFS::readStruct(File& f, T& s, bool ignoreVersion) {
 	// DLOGLN(byteCountRead);
 	if (byteCountRead != byteCount)
 		return false;
-	s = T(*reinterpret_cast<T*>(buffer));
+	s.copyFrom(T(*reinterpret_cast<T*>(buffer)));
 	if (ignoreVersion)
 		return true;
 	StorageStruct* ss = static_cast<StorageStruct*>(&s);
@@ -55,10 +55,112 @@ bool ThFS::writeStruct(File& f, T& s) {
 
 /// ////////////////////////////////////
 
+// TODO: what a disgusting coding pattern here :-(
+// TODO: cow pattern?
+void StorageStruct::copyFrom(const StorageStruct& other) {
+	versionMajor = other.versionMajor;
+	versionMinor = other.versionMinor;
+}
+void SStrSleeping::copyFrom(const SStrSleeping& other) {
+	StorageStruct::copyFrom(other);
+	timeAwake = other.timeAwake;
+	mode = other.mode;
+}
+void SStrConfig::copyFrom(const SStrConfig& other) {
+	StorageStruct::copyFrom(other);
+	periodCapture = other.periodCapture;
+	nMeasurements = other.nMeasurements;
+	periodLive = other.periodLive;
+}
+void SStrDatafile::copyFrom(const SStrDatafile& other) {
+	StorageStruct::copyFrom(other);
+	data = other.data;
+}
+
+bool StorageStruct::readFromFile(File& f) {
+	if (!f)
+		return false;
+	return ThFS::readStruct(f, *this);
+}
+bool StorageStruct::writeToFile(File& f) {
+	if (!f)
+		return false;
+	return ThFS::writeStruct(f, *this);
+}
+bool SStrSleeping::readFromFile(File& f) {
+	if (!f)
+		return false;
+	return ThFS::readStruct(f, *this);
+}
+bool SStrSleeping::writeToFile(File& f) {
+	if (!f)
+		return false;
+	return ThFS::writeStruct(f, *this);
+}
+bool SStrConfig::readFromFile(File& f) {
+	if (!f)
+		return false;
+	return ThFS::readStruct(f, *this);
+}
+bool SStrConfig::writeToFile(File& f) {
+	if (!f)
+		return false;
+	return ThFS::writeStruct(f, *this);
+}
+
+
+bool SStrDatafile::readFromFile(File& f) {
+	if (!f)
+		return false;
+	DLOG("Reading datagile: [");
+	StorageStruct::readFromFile(f);
+	
+	char buffer[12];
+	if (f.readBytes(buffer, sizeof(uint16_t)) != sizeof(uint16_t)) {
+		DLOGLN("Error reading data length!");
+		return false;
+	}
+	
+	uint16_t dSize;
+	memcpy(&dSize, buffer, sizeof(uint16_t));
+	LOG(dSize);
+	LOG("]");
+
+	if (!dSize)
+		return true;
+	
+	data.resize(dSize);
+	for (uint16_t i = 0; i < dSize; ++i) {
+		if (f.readBytes(buffer, sizeof(uint8_t)) != sizeof(uint8_t)) {
+			DLOGLN("Error reading data!");
+			return false;
+		}
+		memcpy(&data[i], buffer, sizeof(uint8_t));
+		LOG(" ");
+		LOG(data[i]);
+	}
+
+	return true;
+}
+bool SStrDatafile::writeToFile(File& f) {
+	if (!f)
+		return false;
+	StorageStruct::writeToFile(f);
+
+	f.write(static_cast<uint16_t>(data.size()));
+	for (auto v : data) {
+		f.write(v);
+	}
+	return true;
+}
+
 // uint8_t StorageStruct::versionMajor = THERMOGRAPH_VERSION_MAJOR;
 // uint8_t StorageStruct::versionMinor = THERMOGRAPH_VERSION_MINOR;
 SStrConfig Storage::_config;
 SStrSleeping Storage::_sleeping;
+SStrDatafile Storage::_datafile;
+
+/// ////////////////////////////////////
 
 bool Storage::init() {
 	if (!ThFS::init())
@@ -76,9 +178,17 @@ bool Storage::retreiveConfig(bool createNew) {
 		if (!f)
 			return false;
 		// DLOGLN("f");
-		bool success = ThFS::readStruct(f, _config);
-		// DLOGLN(success);
+		bool success = _config.readFromFile(f);
+		DLOG("Config retrieved! Values: ");
+		LOG(_config.periodCapture);
+		LOG(" | ");
+		LOG(_config.nMeasurements);
+		LOG(" | ");
+		LOGLN(_config.periodLive);
 		return success;
+		// bool success = ThFS::readStruct(f, _config);
+		// // DLOGLN(success);
+		// return success;
 	}
 	// DLOGLN("doesn't exists");
 	if (!createNew)
@@ -88,9 +198,10 @@ bool Storage::retreiveConfig(bool createNew) {
 	if (!f)
 		return false;
 	// DLOGLN("f");
-	bool success = ThFS::writeStruct(f, _config);
-	// DLOGLN(success);
-	return success;
+	return _config.writeToFile(f);
+	// bool success = ThFS::writeStruct(f, _config);
+	// // DLOGLN(success);
+	// return success;
 }
 
 bool Storage::retreiveSleeping() {
@@ -99,7 +210,8 @@ bool Storage::retreiveSleeping() {
 	File f = ThFS::openR(STORAGEKEY_ISSLEEPING);
 	if (!f)
 		return false;
-	return ThFS::readStruct(f, _sleeping);
+	return _sleeping.readFromFile(f);
+	// return ThFS::readStruct(f, _sleeping);
 }
 
 const SStrSleeping& Storage::getSleeping(bool retrieve) {
@@ -115,7 +227,8 @@ bool Storage::setSleeping(size_t timeAwake, Application::Mode mode) {
 		return false;
 	_sleeping.timeAwake = timeAwake;
 	_sleeping.mode = mode;
-	return ThFS::writeStruct(f, _sleeping);
+	return _sleeping.writeToFile(f);
+	// return ThFS::writeStruct(f, _sleeping);
 }
 
 bool Storage::removeSleeping() {
@@ -135,5 +248,62 @@ bool Storage::storeConfig() {
 	File f = ThFS::openW(STORAGEKEY_CONFIG);
 	if (!f)
 		return false;
-	return ThFS::writeStruct(f, _config);
+	return _config.writeToFile(f);
+	// return ThFS::writeStruct(f, _config);
+}
+
+bool Storage::retreiveDatafile(bool createNew) {
+	bool exists = ThFS::exists(STORAGEKEY_DATAFILE);
+	if (exists) {
+		File f = ThFS::openR(STORAGEKEY_DATAFILE);
+		if (!f)
+			return false;
+		return _datafile.readFromFile(f);
+	}
+	if (!createNew)
+		return false;
+	File f = ThFS::openW(STORAGEKEY_CONFIG);
+	if (!f)
+		return false;
+	return _datafile.writeToFile(f);
+}
+
+SStrDatafile& Storage::getDatafile(bool retrieve) {
+	if (retrieve) {
+		retreiveDatafile();
+	}
+	return _datafile;
+}
+
+bool Storage::cleanDatafile() {
+	if (ThFS::exists(STORAGEKEY_DATAFILE))
+		if (!ThFS::remove(STORAGEKEY_DATAFILE)) {
+			DLOGLN("Couldn't remove datafile!");
+			return false;
+		}
+
+	File f = ThFS::openW(STORAGEKEY_DATAFILE);
+	if (!f) {
+		DLOGLN("Couldn't open datafile!");
+		return false;
+	}
+	
+	_datafile.data.clear();
+
+	return _config.writeToFile(f);
+	// return ThFS::writeStruct(f, _datafile);
+}
+
+bool Storage::addMeasurementData(uint8_t val) {
+	if (!retreiveDatafile())
+		return false;
+	_datafile.data.push_back(val);
+	
+	File f = ThFS::openW(STORAGEKEY_DATAFILE);
+	if (!f) {
+		DLOGLN("Couldn't open datafile!");
+		return false;
+	}
+	return _datafile.writeToFile(f);
+	// return ThFS::writeStruct(f, _datafile);
 }

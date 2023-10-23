@@ -36,16 +36,26 @@ struct StorageStruct {
 	uint8_t versionMinor;
 
 	StorageStruct() : versionMajor(THERMOGRAPH_VERSION_MAJOR), versionMinor(THERMOGRAPH_VERSION_MINOR) { }
-	StorageStruct(const StorageStruct&) = default;
+	StorageStruct(const StorageStruct& other) { copyFrom(other); }
+	virtual void copyFrom(const StorageStruct& other);
+
+	virtual bool readFromFile(File& f);
+	virtual bool writeToFile(File& f);
 };
+
 /// @brief SStruct that contains info to be read after rebot in background task mode
 struct SStrSleeping : StorageStruct {
 	size_t timeAwake = 0;
 	Application::Mode mode = Application::Mode::INTERACT;
 
 	SStrSleeping() = default;
-	SStrSleeping(const SStrSleeping&) = default;
+	SStrSleeping(const SStrSleeping& other) { copyFrom(other); }
+	virtual void copyFrom(const SStrSleeping& other);
+	
+	bool readFromFile(File& f) override;
+	bool writeToFile(File& f) override;
 };
+
 /// @brief SStruct that keeps configuration parameters for the device itself
 struct SStrConfig : StorageStruct {
 	uint16_t periodCapture = 0;
@@ -53,7 +63,23 @@ struct SStrConfig : StorageStruct {
 	uint16_t periodLive = 0;
 	
 	SStrConfig() = default;
-	SStrConfig(const SStrConfig&) = default;
+	SStrConfig(const SStrConfig& other) { copyFrom(other); }
+	virtual void copyFrom(const SStrConfig& other);
+	
+	bool readFromFile(File& f) override;
+	bool writeToFile(File& f) override;
+};
+
+/// @brief SStruct that keeps measured data
+struct SStrDatafile : StorageStruct {
+	std::vector<uint8_t> data;
+	
+	SStrDatafile() = default;
+	SStrDatafile(const SStrDatafile& other) { copyFrom(other); }
+	virtual void copyFrom(const SStrDatafile& other);
+	
+	bool readFromFile(File& f) override;
+	bool writeToFile(File& f) override;
 };
 
 //////////////////////////////////////////////
@@ -62,6 +88,7 @@ struct SStrConfig : StorageStruct {
 class Storage {
 	static bool retreiveSleeping();
 	static bool retreiveConfig(bool createNew = false);
+	static bool retreiveDatafile(bool createNew = false);
 public:
 	static bool init();
 	
@@ -71,9 +98,14 @@ public:
 
 	static SStrConfig& getConfig(bool retrieve = false);
 	static bool storeConfig();
+
+	static SStrDatafile& getDatafile(bool retrieve = false);
+	static bool cleanDatafile();
+	static bool addMeasurementData(uint8_t val);
 private:
 	static SStrConfig _config;
 	static SStrSleeping _sleeping;
+	static SStrDatafile _datafile;
 };
 
 #endif // FILESYSTEM_H__

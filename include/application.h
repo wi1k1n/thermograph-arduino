@@ -16,7 +16,7 @@ public:
 	bool setup();
 	void loop();
 
-	void makeMeasurement();
+	void makeMeasurement(bool storeData = false);
 	bool sleep();
 	bool startBackgroundJob();
 	bool stopBackgroundJob();
@@ -40,18 +40,29 @@ public:
 	}
 	
 	inline bool isModeBackground() const { return _mode == Mode::BACKGROUND; }
-	inline bool isModeBackgroundInterrupted() const { return _mode == Mode::BACKGROUND_INTERRUPTED; }
 	inline bool isModeInteract() const { return _mode == Mode::INTERACT; }
-	inline void setModeBackgroundInterrupted() { _mode = Mode::BACKGROUND_INTERRUPTED; }
-	inline void setModeInteract() { _mode = Mode::INTERACT; }
-	inline bool isInteractionAvailable() const { return isModeBackgroundInterrupted() || isModeInteract() ;}
+	inline void setModeInteract() {
+		DLOGLN("SetMode(INTERACT)");
+		_mode = Mode::INTERACT;
+	}
+	inline void setModeBackground() {
+		DLOGLN("SetMode(BACKGROUND)");
+		_mode = Mode::BACKGROUND;
+	}
+
+	inline bool isInProgress() const { return _isInProgress; }
+	inline void setInProgress(bool val) {
+		DLOG("SetInProgress(");
+		LOG(val ? "true" : "false");
+		LOGLN(")");
+		_isInProgress = val;
+	}
 
 	inline const ThSettings& getSettings() const { return _settings; }
 	inline ThSettings& getSettings() { return _settings; }
 
 	enum Mode {
 		BACKGROUND = 0,				// autonomously woke up while working in background
-		BACKGROUND_INTERRUPTED,		// background job in progress but user interrupt
 		INTERACT,					// no background job in process, fully interact
 #ifdef TDEBUG
 		_DEBUG_LITTLEFS_EXPLORER,
@@ -67,19 +78,21 @@ private:
 private:
 	Mode _mode = Mode::BACKGROUND;
 
-	Display _display;
-	DLTransition _dltransMain;
+	Display _display; 													// Wrapped hardware display
+	DLTransition _dltransMain; 											// Transition class for the display
 
-	std::vector<std::unique_ptr<DisplayLayout>> _dLayouts;
-	DisplayLayoutKeys _dLayoutActiveKey = DisplayLayoutKeys::NONE;
+	std::vector<std::unique_ptr<DisplayLayout>> _dLayouts; 				// Array of display layouts to be used with _display
+	DisplayLayoutKeys _dLayoutActiveKey = DisplayLayoutKeys::NONE; 		// Active display layout that is being showed on _display atm
 
-	HardwareInputs _inputs;
-	ThSettings _settings;
-	TempSensor _sensorTemp;
+	HardwareInputs _inputs; 											// Hardware inputs manager (e.g. pushbuttons)
+	ThSettings _settings; 												// Device settings manager (e.g. timer intervals, temperature units etc.)
+	
+	TempSensor _sensorTemp; 											// Temperature sensor
 
-	TimerMs _realtimeMeasurementTimer;
+	TimerMs _realtimeMeasurementTimer; 									// Timer for the real-time measurements (those that are shown 'live' on main display layout)
+	bool _isInProgress = false; 										// Flag showing if current task of storing data is in progress
 
-	// size_t _timeAwake = 0; // how much time
+	size_t _timeSinceStarted = 0; 										// Timestemp from isSleeping structure, which designates the amount of time spent from when the task started
 };
 
 #endif // APPLICATION_H__
