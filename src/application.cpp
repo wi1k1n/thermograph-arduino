@@ -27,10 +27,6 @@ bool Application::setup() {
 
 	// Minimal initialization
 	{
-		if (!_time.init())
-			return false;
-		reportInitialized("TimerManager initialized");
-
 		if (!ThFS::init())
 			return false;
 		reportInitialized("ThFS initialized");
