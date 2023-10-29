@@ -31,6 +31,7 @@
 // ========= НАСТРОЙКИ (можно передефайнить из скетча) ==========
 #define _VB_DEB 50          // дебаунс кнопки, мс
 #define _VB_CLICK 400	    // таймаут накликивания, мс
+#define _VB_HOLD_DEFAULT 500
 
 // =========== НЕ ТРОГАЙ ============
 #include <Arduino.h>
@@ -189,7 +190,7 @@ private:
     inline bool readF(const uint8_t x) __attribute__((always_inline)) { return _flags & (1 << x); }
 
     uint16_t _flags = 0;
-    uint8_t _holdT = 1000 >> 5;
+    uint8_t _holdT = _VB_HOLD_DEFAULT >> 5;
     uint8_t _stepT = 500 >> 5;
     uint16_t _debTmr = 0;
 };

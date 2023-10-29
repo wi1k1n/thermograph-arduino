@@ -91,7 +91,7 @@ void DLayoutSettings::selectOption(uint8_t idx) {
 	}
 	draw();
 	DLOG("New selected Idx: ");
-	DLOGLN(_selectedOptionIdx);
+	LOGLN(_selectedOptionIdx);
 }
 
 void DLayoutSettings::tick() {

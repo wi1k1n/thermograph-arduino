@@ -26,8 +26,10 @@ bool ThSettings::init(Application* app) {
 		return false;
 	_app = app;
 
+	Storage::readConfig();
 	SStrConfig& config = Storage::getConfig();
-	if (!config.periodCapture || !config.nMeasurements || !config.periodLive) {
+	if (!config.isValid()) {
+		DLOGLN("Config is invalid, creating default one..");
 		_periodCaptureMeasurement = getEntryDefault<uint16_t>(Entries::PERIOD_CAPTURE);
 		_numberOfMeasurements = getEntryDefault<uint16_t>(Entries::N_MEASUREMENTS);
 		_periodLiveMeasurement = getEntryDefault<uint16_t>(Entries::PERIOD_LIVE);
@@ -46,14 +48,9 @@ bool ThSettings::storeConfig() {
 	config.periodCapture = getEntry<uint16_t>(Entries::PERIOD_CAPTURE);
 	config.nMeasurements = getEntry<uint16_t>(Entries::N_MEASUREMENTS);
 	config.periodLive = getEntry<uint16_t>(Entries::PERIOD_LIVE);
-	if (!Storage::storeConfig())
+	if (!Storage::writeConfig())
 		return false;
-	DLOG("Config stored! Values: ");
-	LOG(config.periodCapture);
-	LOG(" | ");
-	LOG(config.nMeasurements);
-	LOG(" | ");
-	LOGLN(config.periodLive);
+	DLOG("Config stored! Values: "); LOG(config.periodCapture); LOG(" | "); LOG(config.nMeasurements); LOG(" | "); LOGLN(config.periodLive);
 	return true;
 }
 

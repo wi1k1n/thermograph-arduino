@@ -61,22 +61,19 @@ bool Application::setup() {
 	}
 	
 	// 
-	const SStrSleeping& sleepingEntry = Storage::getSleeping(true);
-	bool isSleeping = sleepingEntry.timeAwake > 0;
-	if (isSleeping) { 
-		DLOG(F("isSleeping == true: timeAwake = "));
-		LOG(sleepingEntry.timeAwake);
-
-		delay(MODE_DETECTION_DELAY);
+	bool isSleeping = Storage::readSleeping();
+	const SStrSleeping& sleeping = Storage::getSleeping();
+	isSleeping &= sleeping.isValid();
+	if (isSleeping) {
 		if (_inputs.tick(HIChannel::BUTTON1) && _inputs.tick(HIChannel::BUTTON2)) {
 			DLOG(F("WARNING!!! Background task interrupted! Track of time was lost!"));
 			setModeInteract();
 		} else {
 			_timeSinceStarted = isSleeping + _settings.getEntry<uint16_t>(ThSettings::Entries::PERIOD_CAPTURE) * 1000;
-			LOG(" | _timeSinceStarted = ");
-			LOGLN(_timeSinceStarted);
+			DLOG("_timeSinceStarted = "); LOGLN(_timeSinceStarted);
 
 			makeMeasurement(true);
+			
 			SStrDatafile df = Storage::getDatafile();
 			LOG("Data:");
 			for (auto d : df.data) {
@@ -85,12 +82,9 @@ bool Application::setup() {
 			}
 			sleep();
 		}
-		LOGLN("");
 	} else {
 		setModeInteract();
 	}
-	DLOG(F("Mode: "));
-	LOGLN(_mode);
 
 	if (isModeInteract())
 		if (!initDisplayStuff())
@@ -159,12 +153,15 @@ void Application::makeMeasurement(bool storeData) {
 }
 bool Application::sleep() {
 	const SStrSleeping& sleeping = Storage::getSleeping();
-	if (!Storage::setSleeping(millis() + sleeping.timeAwake, _mode))
+	Storage::setSleeping(millis() + sleeping.timeAwake, _mode);
+	if (!Storage::writeSleeping())
 		return false;
+
 	if (isModeInteract()) { // TODO: should not happen here, rather by sleep-timer or by explicit button click
 		_display->clearDisplay();
 		_display->display();
 	}
+
 	setModeBackground(); // TODO: should clearing display be happening here?
 	uint64_t period = _settings.getEntry<uint16_t>(ThSettings::Entries::PERIOD_CAPTURE) * 1e6;
 	ESP.deepSleep(period, RF_DISABLED); // TODO: this is generally wrong as doesn't account for time passed in BI-mode
