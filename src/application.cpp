@@ -65,8 +65,9 @@ bool Application::setup() {
 	const SStrSleeping& sleeping = Storage::getSleeping();
 	isSleeping &= sleeping.isValid();
 	if (isSleeping) {
+		delay(MODE_DETECTION_DELAY);
 		if (_inputs.tick(HIChannel::BUTTON1) && _inputs.tick(HIChannel::BUTTON2)) {
-			DLOG(F("WARNING!!! Background task interrupted! Track of time was lost!"));
+			DLOGLN(F("WARNING!!! Background task interrupted! Track of time was lost!"));
 			setModeInteract();
 		} else {
 			_timeSinceStarted = isSleeping + _settings.getEntry<uint16_t>(ThSettings::Entries::PERIOD_CAPTURE) * 1000;
@@ -74,12 +75,14 @@ bool Application::setup() {
 
 			makeMeasurement(true);
 			
-			SStrDatafile df = Storage::getDatafile();
+			std::vector<uint8_t> buffer;
+			Storage::readData(buffer);
 			LOG("Data:");
-			for (auto d : df.data) {
+			for (auto d : buffer) {
 				LOG(" ");
 				LOG(d);
 			}
+			LOGLN("");
 			sleep();
 		}
 	} else {
@@ -169,18 +172,22 @@ bool Application::sleep() {
 }
 
 bool Application::startBackgroundJob() {
-	if (!Storage::cleanDatafile()) {
-		DLOGLN("Couldn't start background job!");
+	if (!Storage::writeDatafileAndCleanContainer()) {
+		DLOGLN("Couldn't start background job due to writing dataFile or dataFileContainer files!");
 		return false;
 	}
+
 	setInProgress(true);
+	
 	DLOGLN("Background job started!");
 	return true;
 }
 
 bool Application::stopBackgroundJob() {
 	setInProgress(false);
+	
 	activateDisplayLayout(DisplayLayoutKeys::MAIN, DLTransitionStyle::NONE, true);
+	
 	DLOGLN("Background job stopped!");
 	return Storage::removeSleeping();
 }

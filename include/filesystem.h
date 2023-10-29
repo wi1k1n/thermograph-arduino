@@ -70,12 +70,21 @@ struct SStrConfig : StorageStruct {
 
 /// @brief SStruct that keeps measured data
 struct SStrDatafile : StorageStruct {
-	std::vector<uint8_t> data;
+	// uint16_t dataCount = -1;
+	
+#if 0 // TODO: not used atm
+	uint8_t bitsPerMeasurement = 8;
+	int16_t minTemp = -128;
+	int16_t maxTemp = 128;
+#endif
 	
 	SStrDatafile() = default;
 	SStrDatafile(const SStrDatafile& other) { copyFrom(other); }
 	virtual void copyFrom(const SStrDatafile& other);
 	virtual bool convertFromVersion(uint8_t vMaj, uint8_t vMin);
+
+	// bool isValid() const { return dataCount != static_cast<uint16_t>(-1); }
+	bool isValid() const { return true; }
 };
 
 //////////////////////////////////////////////
@@ -94,22 +103,18 @@ public:
 		_sleeping.mode = mode;
 	}
 
-
 	static bool readConfig();
 	static bool writeConfig();
 	static bool removeConfig();
 	static SStrConfig& getConfig() { return _config; }
 
-	// static SStrConfig& getConfig(bool retrieve = false);
-	// static bool storeConfig();
-
-	static SStrDatafile& getDatafile(bool retrieve = false);
-	static bool cleanDatafile();
-	static bool addMeasurementData(uint8_t val);
-private:
 	
-	static bool retreiveConfig(bool createNew = false);
-	static bool retreiveDatafile(bool createNew = false);
+	static bool readDatafile();
+	static bool writeDatafileAndCleanContainer();
+	static bool removeDatafileAndContainer();
+	static const SStrDatafile& getDatafile() { return _datafile; }
+	static bool addMeasurementData(uint8_t val);
+	static bool readData(std::vector<uint8_t>& dst);
 
 private:
 	static SStrConfig _config;

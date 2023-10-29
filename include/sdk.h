@@ -23,9 +23,10 @@ static const uint8_t DISPLAY_ADDRESS = 0x3C;
 static const uint8_t INTERACT_PUSHBUTTON_1_PIN = 14; //D5 0; // D3
 static const uint8_t INTERACT_PUSHBUTTON_2_PIN = 12; //D6 2; // D4
 
-static const char STORAGEKEY_CONFIG[] = "/config";
-static const char STORAGEKEY_ISSLEEPING[] = "/issleeping";
-static const char STORAGEKEY_DATAFILE[] = "/datafile";
+static const char STORAGEKEY_CONFIG[] 				= "/config"; 				// 
+static const char STORAGEKEY_ISSLEEPING[] 			= "/issleeping"; 			//
+static const char STORAGEKEY_DATAFILE[] 			= "/datafile"; 				//
+static const char STORAGEKEY_DATAFILE_CONTAINER[] 	= "/datafile_container"; 	//
 
 // The order in this enum must follow the order of inserting objects in Application class
 // Main menu layouts should go consequently for DLTransitionStyle::AUTO to function properly

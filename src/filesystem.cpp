@@ -87,62 +87,10 @@ bool SStrConfig::convertFromVersion(uint8_t vMaj, uint8_t vMin) {
 
 void SStrDatafile::copyFrom(const SStrDatafile& other) {
 	StorageStruct::copyFrom(other);
-	data = other.data;
 }
 bool SStrDatafile::convertFromVersion(uint8_t vMaj, uint8_t vMin) {
 	return false; // TODO: implement
 }
-
-
-// int16_t SStrDatafile::readFromFile(const char* path) {
-// 	// int16_t offset = StorageStruct::readFromFile(path);
-// 	// File f = ThFS::openR(path);
-// 	// if (!f) {
-// 	// 	DLOGLN("Couldn't open datafile for reading!");
-// 	// 	return false;
-// 	// }
-// 	// f.seek(offset);
-	
-// 	// char buffer[12];
-// 	// if (f.readBytes(buffer, sizeof(uint16_t)) != sizeof(uint16_t)) {
-// 	// 	DLOGLN("Error reading data length!");
-// 	// 	return false;
-// 	// }
-	
-// 	// uint16_t dSize;
-// 	// memcpy(&dSize, buffer, sizeof(uint16_t));
-// 	// DLOG("Reading datafile: ["); LOG(dSize); LOG("]");
-
-// 	// if (!dSize)
-// 	// 	return true;
-	
-// 	// data.resize(dSize);
-// 	// for (uint16_t i = 0; i < dSize; ++i) {
-// 	// 	if (f.readBytes(buffer, sizeof(uint8_t)) != sizeof(uint8_t)) {
-// 	// 		DLOGLN("Error reading data!");
-// 	// 		return false;
-// 	// 	}
-// 	// 	memcpy(&data[i], buffer, sizeof(uint8_t));
-// 	// 	LOG(" ");
-// 	// 	LOG(data[i]);
-// 	// }
-
-// 	return true;
-// }
-// int16_t SStrDatafile::writeToFile(const char* path) {
-// 	// StorageStruct::writeToFile(path);
-// 	// File f = ThFS::openA(path);
-// 	// if (!f) {
-// 	// 	DLOGLN("Couldn't open datafile for writing!");
-// 	// 	return false;
-// 	// }
-
-// 	// f.write(static_cast<uint16_t>(data.size()));
-// 	// for (auto v : data) {
-// 	// 	f.write(v);
-// 	// }
-// 	return true;
-// }
 
 SStrConfig Storage::_config;
 SStrSleeping Storage::_sleeping;
@@ -204,66 +152,74 @@ bool Storage::removeConfig() {
 }
 
 
-// bool Storage::retreiveConfig(bool createNew) {
-// 	bool exists = ThFS::exists(STORAGEKEY_CONFIG);
-// 	if (exists) {
-// 		bool success = _config.readFromFile(STORAGEKEY_CONFIG);
-// 		DLOG("Config retrieved! Values: "); LOG(_config.periodCapture); LOG(" | "); LOG(_config.nMeasurements); LOG(" | "); LOGLN(_config.periodLive);
-// 		return success;
-// 	}
-// 	// DLOGLN("doesn't exists");
-// 	if (!createNew)
-// 		return false;
-// 	return _config.writeToFile(STORAGEKEY_CONFIG);
-// }
 
-// SStrConfig& Storage::getConfig(bool retrieve) {
-// 	if (retrieve) {
-// 		retreiveConfig();
-// 	}
-// 	return _config;
-// }
-
-// bool Storage::storeConfig() {
-// 	return _config.writeToFile(STORAGEKEY_CONFIG);
-// }
-
-bool Storage::retreiveDatafile(bool createNew) {
-	// bool exists = ThFS::exists(STORAGEKEY_DATAFILE);
-	// if (exists)
-	// 	return _datafile.readFromFile(STORAGEKEY_DATAFILE);
-	// if (!createNew)
-	// 	return false;
-	// return _datafile.writeToFile(STORAGEKEY_DATAFILE);
-	return true;
+bool Storage::readDatafile() {
+	if (!ThFS::exists(STORAGEKEY_DATAFILE))
+		return false;
+	return ThFS::readStruct(STORAGEKEY_DATAFILE, _datafile);
 }
 
-SStrDatafile& Storage::getDatafile(bool retrieve) {
-	if (retrieve) {
-		retreiveDatafile();
-	}
-	return _datafile;
-}
-
-bool Storage::cleanDatafile() {
-	// if (ThFS::exists(STORAGEKEY_DATAFILE))
-	// 	if (!ThFS::remove(STORAGEKEY_DATAFILE)) {
-	// 		DLOGLN("Couldn't remove datafile!");
-	// 		return false;
-	// 	}
+bool Storage::writeDatafileAndCleanContainer() {
+	removeDatafileAndContainer();
 	
-	// _datafile.data.clear();
+	if (!ThFS::openW(STORAGEKEY_DATAFILE_CONTAINER)) {
+		DLOGLN("Couldn't create empty dataFileContainer in the filesystem!");
+		return false;
+	}
 
-	// return _config.writeToFile(STORAGEKEY_DATAFILE);
+	return ThFS::writeStruct(STORAGEKEY_DATAFILE, _datafile);
+}
+
+bool Storage::removeDatafileAndContainer() {
+	if (ThFS::exists(STORAGEKEY_DATAFILE_CONTAINER)) {
+		if (!ThFS::remove(STORAGEKEY_DATAFILE_CONTAINER)) {
+			DLOGLN("Couldn't remove existing dataFile in the filesystem!");
+			return false;
+		}
+	}
+	if (ThFS::exists(STORAGEKEY_DATAFILE)) {
+		if (!ThFS::remove(STORAGEKEY_DATAFILE)) {
+			DLOGLN("Couldn't remove existing dataFile in the filesystem!");
+			return false;
+		}
+	}
 	return true;
 }
 
 bool Storage::addMeasurementData(uint8_t val) {
-	// if (!retreiveDatafile())
-	// 	return false;
+	if (!ThFS::exists(STORAGEKEY_DATAFILE_CONTAINER)) {
+		DLOGLN("WARDNING: no dataFileContainer found when adding measurement. New file will be created!");
+		if (!ThFS::openW(STORAGEKEY_DATAFILE_CONTAINER)) {
+			DLOGLN("Couldn't create empty dataFileContainer in the filesystem!");
+			return false;
+		}
+	}
 
-	// _datafile.data.push_back(val);
+	File f = ThFS::openA(STORAGEKEY_DATAFILE_CONTAINER);
+	if (!f) {
+		DLOGLN("Couldn't open dataFileContainer for appending!");
+		return false;
+	}
 
-	// return _datafile.writeToFile(STORAGEKEY_DATAFILE);
+	f.write(val); // TODO: consider bitsPerMeasurement and other configs when writing at this point
+	
+	return true;
+}
+
+bool Storage::readData(std::vector<uint8_t>& dst) {
+	File f = ThFS::openR(STORAGEKEY_DATAFILE_CONTAINER);
+	if (!f) {
+		DLOGLN("Couldn't open dataFileContainer for reading!");
+		return false;
+	}
+	// TODO: Here bitsPerMeasurement and other configs should be considered!
+
+	uint16_t count = f.available();
+	dst.resize(count);
+	uint8_t* buff = dst.data();
+	if (f.readBytes((char*)buff, count) != count) {
+		DLOGLN("Error reading data from dataFileContainer");
+		return false;
+	}
 	return true;
 }
