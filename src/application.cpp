@@ -27,6 +27,10 @@ bool Application::setup() {
 
 	// Minimal initialization
 	{
+		if (!_time.init())
+			return false;
+		reportInitialized("TimerManager initialized");
+
 		if (!ThFS::init())
 			return false;
 		reportInitialized("ThFS initialized");
@@ -60,42 +64,46 @@ bool Application::setup() {
 		reportInitialized("Sensor temp initialized");
 	}
 	
-	// 
+	// Main fork on loading: either silent measurement and back to sleep, or wake up in interactive or BI mode
 	bool isSleeping = Storage::readSleeping();
 	const SStrSleeping& sleeping = Storage::getSleeping();
 	isSleeping &= sleeping.isValid();
 	if (isSleeping) {
-		delay(MODE_DETECTION_DELAY);
-		if (_inputs.tick(HIChannel::BUTTON1) && _inputs.tick(HIChannel::BUTTON2)) {
-			DLOGLN(F("WARNING!!! Background task interrupted! Track of time was lost!"));
-			setModeInteract();
-		} else {
-			_timeSinceStarted = isSleeping + _settings.getEntry<uint16_t>(ThSettings::Entries::PERIOD_CAPTURE) * 1000;
-			DLOG("_timeSinceStarted = "); LOGLN(_timeSinceStarted);
+		DLOG("Retrieved isSleeping.timeAwake = "); LOGLN(sleeping.timeAwake);
 
-			makeMeasurement(true);
-			
+		setInProgress(true);
+
+		// If sleeping in any case making and storing measurement...
+		makeMeasurement(true);
+		
+		{ // DEBUG
 			std::vector<uint8_t> buffer;
 			Storage::readData(buffer);
-			LOG("Data:");
-			for (auto d : buffer) {
-				LOG(" ");
-				LOG(d);
-			}
-			LOGLN("");
-			sleep();
+			LOG("Data:"); for (auto d : buffer) { LOG(" "); LOG(d); } LOGLN("");
+		}
+
+		// ...and then checking if need to load in BI mode
+		delay(MODE_DETECTION_DELAY); // too small comparing to PERIOD_CAPTURE, hence negletting
+		if (_inputs.tick(HIChannel::BUTTON1) && _inputs.tick(HIChannel::BUTTON2)) {
+			DLOGLN(F("WARNING!!! Background task interrupted! Track of time was lost!"));
+			
+			setModeInteract();
+			
+			startTimerBIStore();
+		} else {
+			sleep(false);
 		}
 	} else {
+		setInProgress(false);
 		setModeInteract();
 	}
 
-	if (isModeInteract())
+	if (isModeInteract()) {
 		if (!initDisplayStuff())
 			return false;
-	
-	if (isModeInteract()) {
 		activateDisplayLayout(DisplayLayoutKeys::WELCOME, DLTransitionStyle::NONE);
 	}
+
 	// else if (isModeBackgroundInterrupted()) {
 	// 	activateDisplayLayout(DisplayLayoutKeys::MAIN, DLTransitionStyle::NONE);
 	// 	// activateDisplayLayout(DisplayLayoutKeys::BACKGROUND_INTERRUPTED, DLTransitionStyle::NONE); // TODO: remove this display layout at all!
@@ -113,12 +121,15 @@ void Application::loop() {
 #endif
 
 	// Measurement-related ticks
-	if (_realtimeMeasurementTimer.tick()) {
+	if (_timerRTMeas.tick()) {
 		makeMeasurement();
 	}
 
 	// Storing data timer
-
+	if (_timerBIStore.tick()) {
+		DLOGLN("_timerBIStore triggers storing measurement");
+		makeMeasurement(true);
+	}
 
 	// Display-related ticks
 	_display.tick(); // out of the interact mode scope because of display error led timer
@@ -147,16 +158,25 @@ void Application::makeMeasurement(bool storeData) {
 			Storage::addMeasurementData(dataPtr->temp);
 		}
 		
-		if (isModeInteract())
+		if (isModeInteract()) {
 			_dLayouts[DisplayLayoutKeys::MAIN]->update(dataPtr);
+		}
 		
 		// LOG(F("Temperature: "));
 		// LOGLN(dataPtr->temp);
 	}
 }
-bool Application::sleep() {
+
+bool Application::sleep(bool fromInteraction) {
+	uint16_t periodCapture = _settings.getEntry<uint16_t>(ThSettings::Entries::PERIOD_CAPTURE) * 1e3;
+
 	const SStrSleeping& sleeping = Storage::getSleeping();
-	Storage::setSleeping(millis() + sleeping.timeAwake, _mode);
+
+	size_t newSleepingTime = millis() - _millisWhenStarted + sleeping.timeAwake;
+	if (!fromInteraction)
+		newSleepingTime += periodCapture;
+	Storage::setSleeping(newSleepingTime, _mode);
+
 	if (!Storage::writeSleeping())
 		return false;
 
@@ -164,20 +184,37 @@ bool Application::sleep() {
 		_display->clearDisplay();
 		_display->display();
 	}
-
 	setModeBackground(); // TODO: should clearing display be happening here?
-	uint64_t period = _settings.getEntry<uint16_t>(ThSettings::Entries::PERIOD_CAPTURE) * 1e6;
-	ESP.deepSleep(period, RF_DISABLED); // TODO: this is generally wrong as doesn't account for time passed in BI-mode
+
+	uint64_t capturePeriodMs = periodCapture;
+	if (fromInteraction)
+		capturePeriodMs = _timerBIStore.timeLeft();
+	
+	DLOG("Storing time in sleeping file: "); LOG(newSleepingTime); LOG(". Going to sleep for time: "); LOGLN(capturePeriodMs);
+
+	ESP.deepSleep(capturePeriodMs * 1e3, RF_DISABLED);
 	return true;
 }
 
 bool Application::startBackgroundJob() {
+	_millisWhenStarted = millis();
+
+	// First clean dataFile and dataFileContainer
 	if (!Storage::writeDatafileAndCleanContainer()) {
 		DLOGLN("Couldn't start background job due to writing dataFile or dataFileContainer files!");
 		return false;
 	}
-
+	
 	setInProgress(true);
+	
+	// Set sleeping file flag
+	Storage::setSleeping(0, Mode::INTERACT);
+	if (!Storage::writeSleeping())
+		return false;
+
+	// Start store timer
+	// TODO: should be changed live if settings are changed!!
+	startTimerBIStore(true);
 	
 	DLOGLN("Background job started!");
 	return true;
@@ -185,11 +222,23 @@ bool Application::startBackgroundJob() {
 
 bool Application::stopBackgroundJob() {
 	setInProgress(false);
+	stopTimerBIStore();
 	
 	activateDisplayLayout(DisplayLayoutKeys::MAIN, DLTransitionStyle::NONE, true);
 	
 	DLOGLN("Background job stopped!");
 	return Storage::removeSleeping();
+}
+
+void Application::startTimerBIStore(bool force) {
+	_timerBIStore.setTime(_settings.getEntry<uint16_t>(ThSettings::Entries::PERIOD_CAPTURE) * 1e3);
+	_timerBIStore.start();
+	if (force)
+		_timerBIStore.force();
+}
+
+void Application::stopTimerBIStore() {
+	_timerBIStore.stop();
 }
 
 void Application::activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransitionStyle style, bool force) {

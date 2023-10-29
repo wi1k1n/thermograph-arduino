@@ -44,7 +44,7 @@ struct StorageStruct {
 /// @brief SStruct that contains info to be read after rebot in background task mode
 struct SStrSleeping : StorageStruct {
 	size_t timeAwake = 0;
-	Application::Mode mode = Application::Mode::INTERACT;
+	Application::Mode mode = Application::Mode::INTERACT; // TODO: not used atm
 
 	SStrSleeping() = default;
 	SStrSleeping(const SStrSleeping& other) { copyFrom(other); }

@@ -11,7 +11,7 @@
 #define THERMOGRAPH_VERSION_MAJOR 2
 #define THERMOGRAPH_VERSION_MINOR 1
 
-static const uint16_t MODE_DETECTION_DELAY = 250; // ms
+static const uint16_t MODE_DETECTION_DELAY = 150; // ms
 
 
 static const uint16_t DISPLAY_LAYOUT_LOGO_DELAY = 1000; // ms

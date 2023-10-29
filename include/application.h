@@ -17,7 +17,7 @@ public:
 	void loop();
 
 	void makeMeasurement(bool storeData = false);
-	bool sleep();
+	bool sleep(bool fromInteraction = true);
 	bool startBackgroundJob();
 	bool stopBackgroundJob();
 
@@ -31,12 +31,12 @@ public:
 	void activateDisplayLayout(DisplayLayoutKeys dLayoutKey, DLTransitionStyle style = DLTransitionStyle::AUTO, bool force = false);
 
 	// This timer is only for live preview of the temperature while in interactive mode
-	void setRealtimeMeasurementPeriod(uint32_t period) { _realtimeMeasurementTimer.setTime(period); }
-	void stopRealtimeMeasurement() { _realtimeMeasurementTimer.stop(); }
+	void setRealtimeMeasurementPeriod(uint32_t period) { _timerRTMeas.setTime(period); }
+	void stopRealtimeMeasurement() { _timerRTMeas.stop(); }
 	void startRealtimeMeasurement(bool triggerInstanly = false) {
-		_realtimeMeasurementTimer.start();
+		_timerRTMeas.start();
 		if (triggerInstanly)
-			_realtimeMeasurementTimer.force();
+			_timerRTMeas.force();
 	}
 	
 	inline bool isModeBackground() const { return _mode == Mode::BACKGROUND; }
@@ -70,6 +70,8 @@ public:
 	};
 
 private:
+	void startTimerBIStore(bool force = false);
+	void stopTimerBIStore();
 	bool initDisplayStuff();
 
 	void showDisplayError();
@@ -89,10 +91,11 @@ private:
 	
 	TempSensor _sensorTemp; 											// Temperature sensor
 
-	TimerMs _realtimeMeasurementTimer; 									// Timer for the real-time measurements (those that are shown 'live' on main display layout)
+	TimerMs _timerRTMeas; 												// Timer for the real-time measurements (those that are shown 'live' on main display layout)
 	bool _isInProgress = false; 										// Flag showing if current task of storing data is in progress
 
-	size_t _timeSinceStarted = 0; 										// Timestemp from isSleeping structure, which designates the amount of time spent from when the task started
+	size_t _millisWhenStarted = 0; 										// Current timestamp (in ms) when the task started (0, if task started in different cycle)
+	TimerMs _timerBIStore; 												// Timer for storing measurements while in BI mode
 };
 
 #endif // APPLICATION_H__
