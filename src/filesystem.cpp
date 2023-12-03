@@ -206,7 +206,7 @@ bool Storage::addMeasurementData(uint8_t val) {
 	return true;
 }
 
-bool Storage::readData(std::vector<uint8_t>& dst) {
+bool Storage::readData(std::vector<uint8_t>& dst, size_t offset, size_t count) {
 	File f = ThFS::openR(STORAGEKEY_DATAFILE_CONTAINER);
 	if (!f) {
 		DLOGLN("Couldn't open dataFileContainer for reading!");
@@ -214,7 +214,21 @@ bool Storage::readData(std::vector<uint8_t>& dst) {
 	}
 	// TODO: Here bitsPerMeasurement and other configs should be considered!
 
-	uint16_t count = f.available();
+	uint16_t availCount = f.available();
+	if (availCount <= offset || !f.seek(offset)) {
+		DLOGLN("There's less data than tried to offset on reading!");
+		return false;
+	}
+	
+	availCount = f.available();
+	if (!count)
+		count = availCount;
+	
+	if (availCount < count) {
+		DLOGLN("There's not enough data to read!");
+		return false;
+	}
+
 	dst.resize(count);
 	uint8_t* buff = dst.data();
 	if (f.readBytes((char*)buff, count) != count) {

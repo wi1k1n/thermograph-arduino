@@ -114,7 +114,7 @@ public:
 	static bool removeDatafileAndContainer();
 	static const SStrDatafile& getDatafile() { return _datafile; }
 	static bool addMeasurementData(uint8_t val);
-	static bool readData(std::vector<uint8_t>& dst);
+	static bool readData(std::vector<uint8_t>& dst, size_t offset = 0, size_t count = 0);
 
 private:
 	static SStrConfig _config;

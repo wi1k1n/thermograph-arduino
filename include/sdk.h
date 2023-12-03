@@ -14,7 +14,7 @@
 static const uint16_t MODE_DETECTION_DELAY = 150; // ms
 
 
-static const uint16_t DISPLAY_LAYOUT_LOGO_DELAY = 1000; // ms
+static const uint16_t DISPLAY_LAYOUT_LOGO_DELAY = 800; // ms
 // static const uint8_t DISPLAY_LAYOUT_PADDING_TOP = 16;
 static const uint16_t DISPLAY_LAYOUT_MAIN_MEASUREMENT_PERIOD = 1000; // ms
 
@@ -22,6 +22,9 @@ static const uint8_t DISPLAY_PIN_RESET = 0;
 static const uint8_t DISPLAY_ADDRESS = 0x3C;
 static const uint8_t INTERACT_PUSHBUTTON_1_PIN = 14; //D5 0; // D3
 static const uint8_t INTERACT_PUSHBUTTON_2_PIN = 12; //D6 2; // D4
+
+static const uint8_t NTCTHERMISTOR_PIN = A0; // ADC pin to where NTC thermistor is connected
+static const uint16_t NTCTHERMISTOR_R1_OHMS = 10000; // Resistance of the voltage divider resistor https://www.circuitbasics.com/arduino-thermistor-temperature-sensor-tutorial/
 
 static const char STORAGEKEY_CONFIG[] 				= "/config"; 				// 
 static const char STORAGEKEY_ISSLEEPING[] 			= "/issleeping"; 			//

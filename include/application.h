@@ -89,7 +89,7 @@ private:
 	HardwareInputs _inputs; 											// Hardware inputs manager (e.g. pushbuttons)
 	ThSettings _settings; 												// Device settings manager (e.g. timer intervals, temperature units etc.)
 	
-	TempSensor _sensorTemp; 											// Temperature sensor
+	NTCThermistor _sensorTemp; 											// Temperature sensor
 
 	TimerMs _timerRTMeas; 												// Timer for the real-time measurements (those that are shown 'live' on main display layout)
 	bool _isInProgress = false; 										// Flag showing if current task of storing data is in progress

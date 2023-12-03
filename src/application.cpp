@@ -55,8 +55,10 @@ bool Application::setup() {
 			return false;
 		reportInitialized("Settings manager initialized");
 		
-		if (!_sensorTemp.init())
-			return false;
+		if (NTCThermistor* ntcTemp = static_cast<NTCThermistor*>(&_sensorTemp)) {
+			if (!ntcTemp->init(NTCTHERMISTOR_PIN, NTCTHERMISTOR_R1_OHMS))
+				return false;
+		}
 		reportInitialized("Sensor temp initialized");
 	}
 	
