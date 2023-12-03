@@ -3,11 +3,15 @@
 
 #include "display/display_layout.h"
 
+#include <vector>
+
 class Application;
 
 class DLayoutMeasViewer : public DisplayLayout {
 	float _temp1;
 	Timer _timerRandomPixel;
+	
+	std::vector<uint8_t> _data;
 public:
 	bool init(Display* display, Application* app, HardwareInputs* inputs) override;
 	void draw(bool doDisplay = true) override;

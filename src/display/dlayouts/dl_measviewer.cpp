@@ -1,5 +1,6 @@
 #include "display/dlayouts/dl_measviewer.h"
 #include "application.h"
+#include "filesystem.h"
 
 bool DLayoutMeasViewer::init(Display* display, Application* app, HardwareInputs* inputs) {
 	bool success = DisplayLayout::init(display, app, inputs);
@@ -11,10 +12,16 @@ void DLayoutMeasViewer::update(void* data) {
 void DLayoutMeasViewer::transitionEnterFinished() {
 	DisplayLayout::transitionEnterFinished();
 	_timerRandomPixel.start();
+	
+	Storage::readData(_data);
+	// LOG("Data:"); for (auto d : _data) { LOG(" "); LOG(d); } LOGLN("");
+	draw();
 }
 void DLayoutMeasViewer::transitionLeaveStarted() {
 	DisplayLayout::transitionLeaveStarted();
 	_timerRandomPixel.stop();
+
+	_data.clear();
 }
 void DLayoutMeasViewer::tick() {
 	DisplayLayout::tick();
@@ -51,6 +58,14 @@ void DLayoutMeasViewer::draw(bool doDisplay) {
 	display()->setCursor(0, 0);
 	display()->setTextSize(1);
 	display()->print(F("Measurement Viewer"));
+
+	display()->setCursor(0, 16);
+	display()->setTextSize(1);
+	for (const auto& d : _data) {
+		display()->print((int)d);
+		display()->print(F(" "));
+		// LOG(" "); LOG(d);
+	}
 
 	if (doDisplay) {
 		display()->display();
