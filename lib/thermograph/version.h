@@ -1,0 +1,7 @@
+#ifndef VERSION_H__
+#define VERSION_H__
+
+#define THERMOGRAPH_VERSION_MAJOR 3
+#define THERMOGRAPH_VERSION_MINOR 1
+
+#endif // VERSION_H__
