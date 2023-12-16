@@ -10,6 +10,10 @@
 #define _UART_ Serial
 #endif
 
+// ================================================================================================
+// ========== Debugging toolset ===================================================================
+// ================================================================================================
+
 static void __DEBUG_PRINT_PREAMBULE() {
 	_UART_.print("T:");
 	_UART_.print(millis());
@@ -63,6 +67,13 @@ static void DLOGLN(T v, Ts... ts) {
 	DLOG(v);
 	LOG(ts...);
 	LOGLN();
+}
+
+template <typename T>
+static bool ASSERTPTR(const T* ptr) {
+	if (!ptr)
+		DLOGLN("Assert failed: nullptr!");
+	return ptr;
 }
 
 #endif // SDK_H__

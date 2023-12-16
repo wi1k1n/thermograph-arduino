@@ -3,7 +3,8 @@
 
 #include <Arduino.h>
 
-#include "display/display_ssd1351.h"
+#include "display/display_manager.h"
+#include "display/hardware/hwdisplay_ssd1351.h"
 
 // Screen dimensions
 #define SCREEN_WIDTH  128
@@ -40,6 +41,12 @@
 
 class ThermographApp {
 public:
+	enum class AppMode {
+		NONE = 0,
+		LIVEVIEW, // 
+		STEALTH, // When autonomously woke up just to make a measurement
+	};
+public:
 	ThermographApp() = default;
 
 	void init();
@@ -48,21 +55,21 @@ private:
 	void testLFS();
 	void testDisplay();
 
-	void testlines(uint16_t color);
-	void testdrawtext(char *text, uint16_t color);
-	void testfastlines(uint16_t color1, uint16_t color2);
-	void testdrawrects(uint16_t color);
-	void testfillrects(uint16_t color1, uint16_t color2);
-	void testfillcircles(uint8_t radius, uint16_t color);
-	void testdrawcircles(uint8_t radius, uint16_t color);
-	void testtriangles();
-	void testroundrects();
-	void tftPrintTest();
-	void mediabuttons();
-	void lcdTestPattern(void);
+	// void testlines(uint16_t color);
+	// void testdrawtext(char *text, uint16_t color);
+	// void testfastlines(uint16_t color1, uint16_t color2);
+	// void testdrawrects(uint16_t color);
+	// void testfillrects(uint16_t color1, uint16_t color2);
+	// void testfillcircles(uint8_t radius, uint16_t color);
+	// void testdrawcircles(uint8_t radius, uint16_t color);
+	// void testtriangles();
+	// void testroundrects();
+	// void tftPrintTest();
+	// void mediabuttons();
+	// void lcdTestPattern(void);
 private:
-	Adafruit_SSD1351 tft = Adafruit_SSD1351(SCREEN_WIDTH, SCREEN_HEIGHT, CS_PIN, DC_PIN, MOSI_PIN, SCLK_PIN, RST_PIN);
-	DisplaySSD1351 _display;
+	// Adafruit_SSD1351 tft = Adafruit_SSD1351(SCREEN_WIDTH, SCREEN_HEIGHT, CS_PIN, DC_PIN, MOSI_PIN, SCLK_PIN, RST_PIN);
+	DisplayManager<HWDisplaySSD1351> _displayManager;
 };
 
 #endif // THERMOGRAPH_H__
